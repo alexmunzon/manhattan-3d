@@ -48,16 +48,16 @@ widen the playable area; the world boundary is an explicit polygon.
 
 Verify the current major version and API of each package before using it (APIs drift).
 
-| Concern | Choice |
-|---|---|
-| Language/build | TypeScript (`strict`), Vite |
-| Rendering | Three.js |
-| City data | Google Photorealistic 3D Tiles via NASA-AMMOS [`3d-tiles-renderer`](https://github.com/NASA-AMMOS/3DTilesRendererJS) + its Google auth plugin |
-| Physics | Rapier (`@dimforge/rapier3d-compat`): kinematic character controller, raycast vehicle |
-| Raycasts | `three-mesh-bvh` against loaded tile meshes |
-| Tests | Vitest (unit), Playwright (browser smoke, opt-in) |
-| Quality | ESLint (typescript-eslint), Prettier, `gitleaks` |
-| Assets | Quaternius CC0 characters/vehicles (verify each pack's license) |
+| Concern        | Choice                                                                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language/build | TypeScript (`strict`), Vite                                                                                                                   |
+| Rendering      | Three.js                                                                                                                                      |
+| City data      | Google Photorealistic 3D Tiles via NASA-AMMOS [`3d-tiles-renderer`](https://github.com/NASA-AMMOS/3DTilesRendererJS) + its Google auth plugin |
+| Physics        | Rapier (`@dimforge/rapier3d-compat`): kinematic character controller, raycast vehicle                                                         |
+| Raycasts       | `three-mesh-bvh` against loaded tile meshes                                                                                                   |
+| Tests          | Vitest (unit), Playwright (browser smoke, opt-in)                                                                                             |
+| Quality        | ESLint (typescript-eslint), Prettier, `gitleaks`                                                                                              |
+| Assets         | Quaternius CC0 characters/vehicles (verify each pack's license)                                                                               |
 
 ## 5. Architecture
 
@@ -82,7 +82,7 @@ src/
 **`WorldSource` interface:** `load(center)`, `update(camera)`, `dispose()`, `raycast(ray)`,
 `heightAt(lat, lon)`, `toLocal(geo)` / `toGeo(local)`, `attributions(): string[]`, and a `status` for
 loading/error/no-key states. The game never imports Google-specific code outside `GoogleTilesSource`.
-This keeps the city provider swappable. A future *licensed* source would slot in here.
+This keeps the city provider swappable. A future _licensed_ source would slot in here.
 
 **Coordinates:** one fixed local ENU origin at spawn (re-centered on teleport). Convert once; avatar,
 vehicles, physics, minimap and roads all use the same frame. Unit-test round-trips within ≤ 1 cm.

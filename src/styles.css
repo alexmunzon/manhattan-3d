@@ -1,0 +1,116 @@
+/* Design tokens: docs/VISUAL_SPEC.md */
+:root {
+  --panel-bg: rgba(12, 20, 28, 0.72);
+  --panel-border: rgba(120, 200, 210, 0.25);
+  --panel-blur: 12px;
+  --radius: 10px;
+  --accent: #3fd0c9;
+  --text: #e6f1f3;
+  --text-dim: #8aa3a8;
+  --font-ui: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1016;
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+
+#app canvas {
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--panel-blur));
+  -webkit-backdrop-filter: blur(var(--panel-blur));
+}
+
+.label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.button {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #06201f;
+  background: var(--accent);
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.setup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+}
+
+.setup__title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.setup__text,
+.setup__note {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.setup__note {
+  color: var(--text-dim);
+}
+
+.setup__steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.attribution {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  font-size: 10px;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
