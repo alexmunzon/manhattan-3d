@@ -26,3 +26,20 @@ Append-only. One entry per session: date · milestone · changes · verified · 
   about a chunk over 500 kB (three.js); code-split later if load time matters.
 - **Next:** M1. Add `3d-tiles-renderer` and `GoogleTilesSource`. This needs the owner's restricted API key
   in `.env`.
+
+## 2026-09-29 · M1 World streaming
+
+- **Changes:** Added `GoogleTilesSource` (3d-tiles-renderer 0.5.3 with the Google auth, glTF/Draco, fade,
+  unload and reorientation plugins, and a 250–350 MB LRU cache). The game uses it automatically when
+  `.env` has a key. Added a Draco decoder copy script (`predev`/`prebuild`), key-safe error messages
+  (`tileErrors.ts`), a live attribution line, an error notice panel, and a dev-only `window.__manhattan`
+  debug handle.
+- **Verified (Chrome, real key):** Lower Manhattan renders photoreal with no console errors. Orientation
+  is correct: the tallest structure found sits within ~40 m of One World Trade Center's expected position.
+  Spawn street level is about -30 m ellipsoid height. Memory held at 51–184 geometries over 3 camera
+  laps, JS heap ~191 MB. 19 unit tests pass.
+- **Not verified:** that only one billable root request is made per session (the network buffer overflowed).
+  The rejected-key and quota paths weren't run live.
+- **Security incident:** the key was echoed once into the assistant's tool output while fixing `.env`
+  formatting. The owner was advised to regenerate the key.
+- **Next:** add the official Google logo asset and check Google's collision policy (ADR-004), then M2.

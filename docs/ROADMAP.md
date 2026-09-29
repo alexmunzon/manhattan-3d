@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M1 — World streaming** (next up; needs a restricted Google Maps API key)
+## Current: **M1 — World streaming** (finish: Google logo, policy check) → then **M2 — On foot**
 
 ## M0 — Scaffold
 
@@ -16,10 +16,10 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M1 — World streaming (Google tiles)
 
-- [ ] `GoogleTilesSource` streams tiles around the configured Lower Manhattan spawn
-- [ ] Google logo + dynamic attributions visible, never covered by HUD
-- [ ] Tile radius / LOD cap; distant tiles disposed; memory stable over repeated traversal (measured)
-- [ ] Clear errors: missing key, rejected key, quota exceeded, network failure
+- [x] `GoogleTilesSource` streams tiles around the configured Lower Manhattan spawn
+- [~] Dynamic attributions visible (verified); official Google logo asset still needed from Google brand resources
+- [x] Tile radius / LOD cap; distant tiles disposed; memory stable over repeated traversal (measured: 51–184 geometries over 3 laps, no growth)
+- [~] Clear errors: missing key verified in browser; rejected/quota/network messages unit-tested only
 - [ ] Policy check: runtime collision against loaded tiles allowed? (record ADR)
 
 ## M2 — On foot
