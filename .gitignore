@@ -1,0 +1,31 @@
+# Dependencies & build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Test & tool output
+playwright-report/
+test-results/
+*.log
+
+# Never commit map data (see docs/DECISIONS.md ADR-002/004)
+tiles/
+*.b3dm
+*.glb.cache
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Local Claude settings
+.claude/settings.local.json
