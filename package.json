@@ -14,12 +14,15 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks",
+    "predev": "node scripts/copy-draco.mjs",
+    "prebuild": "node scripts/copy-draco.mjs"
   },
   "license": "MIT",
   "type": "module",
   "private": "true",
   "dependencies": {
+    "3d-tiles-renderer": "^0.5.3",
     "three": "^0.186.1"
   },
   "devDependencies": {

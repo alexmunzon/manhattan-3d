@@ -7,3 +7,12 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Dev-only debug handle for inspecting the running game from the browser console. */
+interface Window {
+  __manhattan?: {
+    renderer: import('three').WebGLRenderer;
+    world: import('./world/WorldSource').WorldSource;
+    camera: import('three').Camera;
+  };
+}
