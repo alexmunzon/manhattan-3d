@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M4 — Drive** (carry-overs: M1 Google logo + policy check; human playtest of M2/M3 feel)
+## Current: **M5 — HUD & polish** (carry-overs: M1 Google logo + policy check; human playtest of M2–M4 feel; CC0 car model)
 
 ## M0 — Scaffold
 
@@ -36,8 +36,8 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M4 — Drive
 
-- [ ] Enter/exit nearest car; arcade steer/accelerate/brake/reverse
-- [ ] Collision + flip recovery; speed HUD (mph); distinct camera rig
+- [x] V enters the car within 5 m or calls it to you (parks at your ground level); arcade throttle/brake/reverse/handbrake, speed-sensitive steering; exits on the clear side
+- [x] Bumper-probe wall bounce, 4-wheel ground following (pitch/roll), cannot flip, fall + streaming-hole recovery; "Driving · mph" HUD; 7 m / 65° camera rig with heading recenter
 
 ## M5 — HUD & polish
 

@@ -48,3 +48,23 @@ walls, steps up curbs and snaps to the ground, with `three-mesh-bvh` for speed. 
 **Consequences:** It works the same on every world source and is fully unit-testable on the demo city.
 There's no physical interaction between the player and objects. Thin geometry smaller than the probe
 spacing can be missed.
+
+## ADR-006 — Raycast arcade car instead of Rapier (2026-09-29)
+
+**Context:** ADR-005 deferred Rapier to vehicles. An arcade car needs no rigid-body dynamics, and
+Rapier would still need colliders built from streaming tiles.
+**Decision:** `CarController` is kinematic: bicycle-model steering, four-corner ground raycasts for
+height, pitch and roll, and bumper raycasts that bounce the car off walls. Rapier is dropped for v1.
+**Consequences:** The car can't flip or tumble, which keeps it arcade-friendly and removes the need for
+flip recovery. It's deterministic and unit-tested on the demo city. There are no car-to-car physics.
+Photogrammetry parked cars and trees act as solid obstacles.
+
+## ADR-007 — Recover from streaming holes (2026-09-29)
+
+**Context:** In the browser, the player fell through Google tiles right after spawning. While tiles
+swap detail levels, the surface underfoot can briefly disappear.
+**Decision:** If the player or car has dropped more than 3 m below its last safe spot and the topmost
+surface at its x/z is back within 3 m of that height, snap it onto that surface. Spawning also picks
+the nearest street-level point, never a rooftop.
+**Consequences:** Streaming gaps no longer cause long falls. A real fall off a roof is unaffected,
+because the surface below a roof edge is the street, far lower.

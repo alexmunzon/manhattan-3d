@@ -16,6 +16,8 @@ const idle: CharacterInput = {
   sprint: false,
   jump: false,
   glider: false,
+  vehicle: false,
+  handbrake: false,
 };
 
 let tall: DemoCitySource;

@@ -85,6 +85,33 @@ describe('PlayerController on the demo city', () => {
     expect(player.position.y).toBeCloseTo(roof, 2);
   });
 
+  it('climbs back onto its floor after a streaming hole instead of falling forever', () => {
+    let blind = false;
+    const flaky = {
+      raycast: (...args: Parameters<DemoCitySource['raycast']>) =>
+        blind ? null : city.raycast(...args),
+      heightAt: (x: number, z: number) => (blind ? null : city.heightAt(x, z)),
+    } as unknown as DemoCitySource;
+    const player = new PlayerController(flaky);
+    player.spawnAt(0, 0, 24);
+    blind = true; // tiles swapping: nothing under the player
+    run(player, idle, 0.8);
+    expect(player.position.y).toBeLessThan(-3);
+    blind = false;
+    run(player, idle, 0.1);
+    expect(player.position.y).toBeCloseTo(0, 3);
+    expect(player.onGround).toBe(true);
+  });
+
+  it('still falls normally off a roof edge', () => {
+    const roof = city.heightAt(24, 24) ?? 0;
+    const player = spawn(24, 24);
+    player.position.set(0, roof, 24); // step off the roof over the street
+    player.onGround = false;
+    run(player, idle, 4);
+    expect(player.position.y).toBeCloseTo(0, 3);
+  });
+
   it('returns to spawn on respawn', () => {
     const player = spawn(0, 24);
     run(player, { ...idle, forward: 1 }, 2);

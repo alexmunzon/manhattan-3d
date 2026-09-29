@@ -25,6 +25,12 @@ hang-glide through. TypeScript + Vite + Three.js + Rapier. Public portfolio repo
 
 - `npm install` · `npm run dev` · `npm run check` (lint + typecheck + test) · `npm run test:e2e` (opt-in)
 
+## Testing in a browser
+
+- Open `http://127.0.0.1:5173/?headless` for automated checks. It keeps rendering and tile streaming
+  alive in hidden tabs. `window.__manhattan` exposes the game in dev builds only.
+- Keep one game tab open: every tab opens its own billable Google tiles session.
+
 ## Owner context
 
 The owner is learning engineering through this project. Explain decisions in plain language, one or two

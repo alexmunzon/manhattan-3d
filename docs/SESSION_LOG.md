@@ -83,3 +83,22 @@ Append-only. One entry per session: date · milestone · changes · verified · 
 - **Known polish:** from directly behind, the glider wing looks edge-on (a thin line). Lift the camera
   during glide in M5.
 - **Next:** M4 Drive (the `Driving_Loop` clip already exists in the character file).
+
+## 2026-09-29 · M4 Drive
+
+- **Changes:** Added `CarController` (arcade raycast car, ADR-006), a procedural `CarModel` with
+  spinning and steering wheels, and a `driving` mode in the state machine. V enters the car or calls it,
+  and exit picks the clear side. Added the driving camera rig and HUD, and the `Driving_Loop` pose (the
+  avatar is hidden in the car). `findStreetLevel` spawns at the nearest street-level point.
+  Floor-gap recovery covers the player and car (ADR-007). Replaced the `tick` hook with a dev-only
+  `?headless` URL flag that runs frames on timers, so hidden tabs keep rendering and streaming.
+- **Verified:** 62 unit tests pass (car speed, brake, reverse, handbrake, steering, wall bounce,
+  placement, enter/drive/exit, passenger-side exit, calling the car, reset, street spawn, floor-gap
+  recovery, roof-edge fall). In the browser on Google tiles with `?headless`: spawned on the street at
+  y ≈ -26.8 with the car beside the player, entered with V, reached 72 mph, drove 66 m along the street
+  staying grounded, and exited with V standing beside the car.
+- **Found and fixed:** the player fell through a tile-swap hole at spawn (ADR-007). Spawning was
+  landing on rooftops. Exiting put the player into a wall.
+- **Testing tip:** automated browser checks should open `http://127.0.0.1:5173/?headless`.
+- **Next:** M5 HUD and polish (minimap, teleport, keycap legend, post-processing, lifting the glider
+  camera). Decide on a CC0 car model (needs owner approval to download).

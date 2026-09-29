@@ -1,7 +1,7 @@
 import { el } from './dom';
 
 const CONTROLS =
-  'WASD move · Shift sprint · Space jump/climb · H glider (in air) · Wheel zoom · R reset · Esc release';
+  'WASD move · Shift sprint · Space jump/climb · V car · H glider (in air) · Wheel zoom · R reset · Esc release';
 
 /** Bottom-centre hint that prompts for pointer lock and lists controls. */
 export class PlayHint {

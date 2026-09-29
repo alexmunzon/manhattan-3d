@@ -28,6 +28,13 @@ export const PLAYER = {
   minFloorNormalY: 0.6,
   /** Falling this far below the last safe spot counts as falling through the world. */
   fallLimit: 150,
+  /**
+   * Streaming tiles can briefly leave a hole while they swap detail levels. If the player has
+   * dropped this far below where they stood, and the surface at their spot is back within
+   * `floorRecoveryBand` of that height, they fell through their own floor: put them back on it.
+   */
+  floorRecoveryDrop: 3,
+  floorRecoveryBand: 3,
   /** Wait this long after ground first appears, so tiles can refine before spawning. */
   spawnSettleSeconds: 1.5,
 } as const;
@@ -68,10 +75,15 @@ export class PlayerController {
     }
     this.settleTimer += dt;
     if (this.settleTimer < PLAYER.spawnSettleSeconds) return false;
-    this.spawnPoint.set(x, ground, z);
+    this.spawnAt(x, ground, z);
+    return true;
+  }
+
+  /** Sets the spawn point and places the player there immediately. */
+  spawnAt(x: number, y: number, z: number): void {
+    this.spawnPoint.set(x, y, z);
     this.respawn();
     this.spawned = true;
-    return true;
   }
 
   /** Returns to the spawn point, standing still. */
@@ -98,10 +110,21 @@ export class PlayerController {
     this.moveHorizontally(dt);
     this.moveVertically(dt);
 
+    if (!this.onGround) this.recoverFromFloorGap();
     if (this.position.y < this.lastSafe.y - PLAYER.fallLimit) {
       this.position.copy(this.lastSafe);
       this.velocity.set(0, 0, 0);
     }
+  }
+
+  private recoverFromFloorGap(): void {
+    if (this.position.y > this.lastSafe.y - PLAYER.floorRecoveryDrop) return;
+    const top = this.world.heightAt(this.position.x, this.position.z);
+    if (top === null || Math.abs(top - this.lastSafe.y) > PLAYER.floorRecoveryBand) return;
+    this.position.y = top;
+    this.velocity.y = 0;
+    this.onGround = true;
+    this.lastSafe.copy(this.position);
   }
 
   /** Horizontal speed in m/s. */

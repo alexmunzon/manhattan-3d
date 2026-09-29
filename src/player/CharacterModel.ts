@@ -31,6 +31,7 @@ const CLIP_FOR_POSE: Record<Pose, string> = {
   fall: 'Rig|Jump_Loop',
   climb: 'Rig|Crouch_Fwd_Loop',
   glide: 'Rig|Jump_Loop',
+  drive: 'Rig|Driving_Loop',
 };
 
 /** Rigged, animated character (Quaternius Universal Animation Library). */

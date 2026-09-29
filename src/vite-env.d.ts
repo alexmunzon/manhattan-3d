@@ -15,7 +15,5 @@ interface Window {
     world: import('./world/WorldSource').WorldSource;
     camera: import('three').Camera;
     character: import('./player/Character').Character;
-    /** Advances one frame using real elapsed time. */
-    tick: () => void;
   };
 }

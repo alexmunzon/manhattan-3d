@@ -1,5 +1,7 @@
 import { Ray, Vector3 } from 'three';
 import { nextMode, type GameMode, type ModeEvent } from '../state/gameMode';
+import { CAR, CarController } from '../vehicles/CarController';
+import { findStreetLevel } from '../world/ground';
 import type { WorldSource } from '../world/WorldSource';
 import { GliderController, type GliderInput } from './GliderController';
 import { findLedge, type LedgeTarget } from './ledge';
@@ -10,6 +12,10 @@ import type { Pose } from './pose';
 export interface CharacterInput extends MoveIntent {
   /** Toggle the glider (H). */
   glider: boolean;
+  /** Enter, exit or call the car (V). */
+  vehicle: boolean;
+  /** Held brake while driving (Space). */
+  handbrake: boolean;
 }
 
 const CLIMB_SECONDS = 0.7;
@@ -18,6 +24,21 @@ const CLIMB_RISE_PORTION = 0.65;
 const LANDING_SPEED_KEPT = 0.5;
 const SPRINT_POSE_SPEED = 6;
 const IDLE_SPEED = 0.3;
+/** Search radius around the configured spawn for street level. */
+const SPAWN_SEARCH_RADIUS = 40;
+const SPAWN_SETTLE_SECONDS = 1.5;
+/** Cars within this distance can be entered; otherwise V calls the car to you. */
+const ENTER_DISTANCE = 5;
+const CAR_CALL_OFFSET = 3.5;
+/** Candidate parking spots as (right, back) unit offsets from the player. */
+const CAR_CALL_SPOTS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1.5],
+  [0, -1.5],
+] as const;
+const CAR_CALL_MAX_STEP = 1;
+const EXIT_SIDE_OFFSET = CAR.halfWidth + 0.8;
 
 /**
  * Owns the player's mode (on foot, climbing, gliding) and routes each frame to the one active
@@ -27,18 +48,41 @@ export class Character {
   mode: GameMode = 'onFoot';
   readonly foot: PlayerController;
   readonly glider: GliderController;
+  readonly car: CarController;
+  /** True once the car has been placed in the world. */
+  carPlaced = false;
   /** Facing yaw for the avatar (0 = north). */
   facing = 0;
 
   private climb: { from: Vector3; to: LedgeTarget; t: number } | null = null;
   private jumpedAt = -1;
   private time = 0;
+  private settle = 0;
   private readonly forward = new Vector3();
   private readonly ray = new Ray();
 
   constructor(private readonly world: WorldSource) {
     this.foot = new PlayerController(world);
     this.glider = new GliderController(world);
+    this.car = new CarController(world);
+  }
+
+  /**
+   * Spawns on foot at street level near game-space (x, z) once tiles there have loaded and settled,
+   * and parks the car beside the player. Call every frame until it returns true.
+   */
+  trySpawn(dt: number, x = 0, z = 0): boolean {
+    if (this.world.heightAt(x, z) === null) {
+      this.settle = 0;
+      return false;
+    }
+    this.settle += dt;
+    if (this.settle < SPAWN_SETTLE_SECONDS) return false;
+    const street = findStreetLevel(this.world, x, z, SPAWN_SEARCH_RADIUS);
+    if (!street) return false;
+    this.foot.spawnAt(street.x, street.y, street.z);
+    this.callCar(0);
+    return true;
   }
 
   get position(): Vector3 {
@@ -51,7 +95,9 @@ export class Character {
 
   /** Horizontal speed in m/s. */
   get speed(): number {
-    return this.mode === 'gliding' ? this.glider.airspeed : this.foot.speed;
+    if (this.mode === 'gliding') return this.glider.airspeed;
+    if (this.mode === 'driving') return Math.abs(this.car.speed);
+    return this.foot.speed;
   }
 
   /** Height above the surface below, in metres, or null if nothing is below. */
@@ -79,6 +125,9 @@ export class Character {
       case 'gliding':
         this.updateGlide(dt, input);
         break;
+      case 'driving':
+        this.updateDrive(dt, input);
+        break;
     }
   }
 
@@ -86,6 +135,7 @@ export class Character {
   get pose(): Pose {
     if (this.mode === 'climbing') return 'climb';
     if (this.mode === 'gliding') return 'glide';
+    if (this.mode === 'driving') return 'drive';
     if (!this.foot.onGround) return this.time - this.jumpedAt < 0.35 ? 'jump' : 'fall';
     if (this.foot.speed < IDLE_SPEED) return 'idle';
     return this.foot.speed > SPRINT_POSE_SPEED ? 'sprint' : 'run';
@@ -105,6 +155,14 @@ export class Character {
       this.glider.deploy(this.velocity, cameraYaw);
       this.send('deployGlider');
       return;
+    }
+    if (input.vehicle && !airborne) {
+      if (this.carPlaced && this.position.distanceTo(this.car.position) <= ENTER_DISTANCE) {
+        this.velocity.set(0, 0, 0);
+        this.send('enterCar');
+        return;
+      }
+      this.callCar(cameraYaw);
     }
     if (input.jump && !airborne) this.jumpedAt = this.time;
     this.foot.update(dt, input, cameraYaw);
@@ -157,6 +215,65 @@ export class Character {
       this.foot.onGround = false;
     }
     this.send('land');
+  }
+
+  /**
+   * Parks the car next to the player, facing `yaw`: tries right, left, behind, then ahead, and
+   * uses the first spot at the player's own ground level (never a rooftop or inside a building).
+   */
+  private callCar(yaw: number): void {
+    const sin = Math.sin(yaw);
+    const cos = Math.cos(yaw);
+    for (const [right, back] of CAR_CALL_SPOTS) {
+      const x = this.position.x + (cos * right + sin * back) * CAR_CALL_OFFSET;
+      const z = this.position.z + (-sin * right + cos * back) * CAR_CALL_OFFSET;
+      const ground = this.world.heightAt(x, z);
+      if (ground === null || Math.abs(ground - this.position.y) > CAR_CALL_MAX_STEP) continue;
+      this.carPlaced = this.car.place(x, z, yaw);
+      return;
+    }
+  }
+
+  private updateDrive(dt: number, input: CharacterInput): void {
+    if (input.vehicle) {
+      this.exitCar();
+      return;
+    }
+    this.car.update(dt, {
+      throttle: input.forward,
+      steer: input.right,
+      handbrake: input.handbrake,
+    });
+    this.position.copy(this.car.position);
+    this.velocity.set(
+      -Math.sin(this.car.yaw) * this.car.speed,
+      this.car.verticalSpeed,
+      -Math.cos(this.car.yaw) * this.car.speed,
+    );
+    this.facing = this.car.yaw;
+  }
+
+  /** Steps out on the driver's (left) side, or the passenger side if a wall blocks it. */
+  private exitCar(): void {
+    const { yaw } = this.car;
+    const side = this.sideIsClear(-1, yaw) ? -1 : 1;
+    this.position.set(
+      this.car.position.x + side * Math.cos(yaw) * EXIT_SIDE_OFFSET,
+      this.car.position.y + 0.5,
+      this.car.position.z - side * Math.sin(yaw) * EXIT_SIDE_OFFSET,
+    );
+    this.velocity.set(0, 0, 0);
+    this.car.speed = 0;
+    this.foot.onGround = false;
+    this.send('exitCar');
+  }
+
+  /** True if nothing blocks stepping out on `side` (-1 left, 1 right) of a car facing `yaw`. */
+  private sideIsClear(side: number, yaw: number): boolean {
+    this.ray.origin.copy(this.car.position);
+    this.ray.origin.y += 1;
+    this.ray.direction.set(side * Math.cos(yaw), 0, -side * Math.sin(yaw));
+    return this.world.raycast(this.ray, EXIT_SIDE_OFFSET + 0.4) === null;
   }
 
   private send(event: ModeEvent): void {

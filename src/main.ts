@@ -25,6 +25,7 @@ import { Character, type CharacterInput } from './player/Character';
 import { CharacterModel } from './player/CharacterModel';
 import type { AvatarView } from './player/pose';
 import type { GameMode } from './state/gameMode';
+import { CarModel } from './vehicles/CarModel';
 import { GliderWing } from './vehicles/GliderWing';
 import { DemoCitySource } from './world/DemoCitySource';
 import { GoogleTilesSource } from './world/GoogleTilesSource';
@@ -44,6 +45,7 @@ const RIGS: Record<GameMode, CameraRig> = {
   onFoot: { distance: 4, fov: 60 },
   climbing: { distance: 4, fov: 60 },
   gliding: { distance: 9, fov: 70 },
+  driving: { distance: 7, fov: 65 },
 };
 const GLIDE_FOV_PER_MPS = 0.35;
 const FOG = { demo: { near: 300, far: 1400 }, google: { near: 900, far: 4500 } } as const;
@@ -96,7 +98,9 @@ async function start(app: HTMLElement): Promise<void> {
     return new Avatar();
   });
   const wing = new GliderWing();
-  scene.add(wing.root);
+  const carModel = new CarModel();
+  scene.add(wing.root, carModel.root);
+  carModel.root.visible = false;
   const followCamera = new FollowCamera(camera);
   const hint = new PlayHint(hud);
   const modeHud = new ModeHud(hud);
@@ -106,6 +110,8 @@ async function start(app: HTMLElement): Promise<void> {
     sprint: false,
     jump: false,
     glider: false,
+    vehicle: false,
+    handbrake: false,
   };
 
   renderer.domElement.addEventListener(
@@ -128,27 +134,38 @@ async function start(app: HTMLElement): Promise<void> {
 
     const spawned = character.foot.spawned;
     if (!spawned) {
-      if (character.foot.trySpawn(0, 0, dt)) scene.add(avatar.root);
+      if (character.trySpawn(dt)) scene.add(avatar.root);
     } else {
       readIntent(input, intent);
       if (input.wasPressed('KeyR')) character.reset();
       character.update(dt, intent, followCamera.yaw);
 
       const gliding = character.mode === 'gliding';
+      const driving = character.mode === 'driving';
+      const { car } = character;
       const { position } = character;
       const bank = character.glider.bank;
       avatar.root.position.copy(position);
       avatar.update(dt, character.pose, character.speed, character.facing, bank);
+      avatar.root.visible = !driving;
       wing.update(gliding, position.x, position.y, position.z, character.facing, bank);
+      carModel.root.visible = character.carPlaced;
+      if (character.carPlaced) {
+        const p = car.position;
+        carModel.update(dt, p.x, p.y, p.z, car.yaw, car.pitch, car.roll, car.speed, car.steer);
+      }
 
       const rig = RIGS[character.mode];
       followCamera.setRig(
         gliding ? { ...rig, fov: rig.fov + character.speed * GLIDE_FOV_PER_MPS } : rig,
       );
       const look = input.look;
-      if (gliding) followCamera.recenter(character.facing, dt, look.x !== 0 || look.y !== 0);
+      if (gliding || driving) {
+        followCamera.recenter(character.facing, dt, look.x !== 0 || look.y !== 0);
+      }
       followCamera.update(dt, position, look, world);
-      modeHud.set(gliding ? 'Gliding' : null, character.speed, character.altitude);
+      if (gliding) modeHud.set('Gliding', character.speed, character.altitude);
+      else modeHud.set(driving ? 'Driving' : null, character.speed, null);
     }
     hint.set(!spawned ? 'loading' : input.locked ? 'playing' : 'unlocked');
 
@@ -158,13 +175,23 @@ async function start(app: HTMLElement): Promise<void> {
   };
   renderer.setAnimationLoop(runFrame);
 
-  if (import.meta.env.DEV) {
-    // Lets automated checks advance the game even when the tab is hidden and rAF is paused.
-    const tick = (): void => {
-      runFrame(performance.now());
-    };
-    window.__manhattan = { renderer, world, camera, character, tick };
-  }
+  if (import.meta.env.DEV) window.__manhattan = { renderer, world, camera, character };
+}
+
+/**
+ * Dev-only `?headless`: drive frames from a timer instead of requestAnimationFrame, which browsers
+ * pause in hidden tabs. Used by automated browser checks; rendering and tile streaming both keep
+ * running. Must run before anything schedules a frame.
+ */
+function installHeadlessClock(): void {
+  const FRAME_MS = 16;
+  window.requestAnimationFrame = (callback) =>
+    window.setTimeout(() => {
+      callback(performance.now());
+    }, FRAME_MS);
+  window.cancelAnimationFrame = (handle) => {
+    window.clearTimeout(handle);
+  };
 }
 
 /** Maps held keys to a device-independent movement intent. */
@@ -176,6 +203,12 @@ function readIntent(input: Input, out: CharacterInput): void {
   out.sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
   out.jump = input.wasPressed('Space');
   out.glider = input.wasPressed('KeyH');
+  out.vehicle = input.wasPressed('KeyV');
+  out.handbrake = input.isDown('Space');
+}
+
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('headless')) {
+  installHeadlessClock();
 }
 
 const app = document.getElementById('app');
