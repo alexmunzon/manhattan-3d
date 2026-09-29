@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M1 — World streaming** (finish: Google logo, policy check) → then **M2 — On foot**
+## Current: **M3 — Climb & glide** (open carry-overs: M1 Google logo + policy check, M2 CC0 avatar)
 
 ## M0 — Scaffold
 
@@ -24,9 +24,9 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M2 — On foot
 
-- [ ] WASD + mouse orbit, sprint, jump; pointer-lock/focus handling
-- [ ] Animated rigged avatar (CC0), follow camera without clipping
-- [ ] Collision against nearby tiles; cannot fall through world; reset-to-spawn key
+- [~] WASD, sprint, jump, pointer lock, blur handling built; movement verified in unit tests + scripted browser run; mouse-look needs a human playtest
+- [~] Procedural animated mannequin (placeholder) + follow camera with wall pull-in; CC0 rigged character pending owner-approved download
+- [x] Collision against tiles via BVH raycasts (0.04 ms/ray measured); fall-through recovery; R resets (unit-tested)
 
 ## M3 — Climb & glide
 

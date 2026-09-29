@@ -1,13 +1,16 @@
-import type { Camera, Object3D, Ray } from 'three';
-import type { LocalFrame, Vec3 } from './geo';
+import type { Camera, Intersection, Object3D, Ray } from 'three';
+import { Vector3 } from 'three';
+import type { LocalFrame } from './geo';
 
 /** Lifecycle state of a world source, surfaced to the HUD. */
 export type WorldStatus =
   { kind: 'idle' } | { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
 
-/** A ray hit against world geometry, in game space. */
+/** A ray hit against world geometry, in game space. Reused between calls; copy to keep. */
 export interface WorldHit {
-  point: Vec3;
+  point: Vector3;
+  /** Unit surface normal facing the ray origin. */
+  normal: Vector3;
   distance: number;
 }
 
@@ -36,4 +39,25 @@ export interface WorldSource {
   attributions(): readonly string[];
   /** Releases all GPU and CPU resources. The source is unusable afterwards. */
   dispose(): void;
+}
+
+/**
+ * Converts a three.js intersection into a {@link WorldHit}, writing into `out`.
+ * The normal is flipped if needed so it always faces the ray (photogrammetry winding is unreliable).
+ */
+export function toWorldHit(hit: Intersection, ray: Ray, out: WorldHit): WorldHit {
+  out.point.copy(hit.point);
+  out.distance = hit.distance;
+  if (hit.face) {
+    out.normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
+    if (out.normal.dot(ray.direction) > 0) out.normal.negate();
+  } else {
+    out.normal.copy(ray.direction).negate();
+  }
+  return out;
+}
+
+/** Allocates a reusable {@link WorldHit}. */
+export function createWorldHit(): WorldHit {
+  return { point: new Vector3(), normal: new Vector3(), distance: 0 };
 }

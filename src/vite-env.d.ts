@@ -14,5 +14,6 @@ interface Window {
     renderer: import('three').WebGLRenderer;
     world: import('./world/WorldSource').WorldSource;
     camera: import('three').Camera;
+    player: import('./player/PlayerController').PlayerController;
   };
 }

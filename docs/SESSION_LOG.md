@@ -43,3 +43,22 @@ Append-only. One entry per session: date · milestone · changes · verified · 
 - **Security incident:** the key was echoed once into the assistant's tool output while fixing `.env`
   formatting. The owner was advised to regenerate the key.
 - **Next:** add the official Google logo asset and check Google's collision policy (ADR-004), then M2.
+
+## 2026-09-29 · M2 On foot
+
+- **Changes:** Added `Input` (keyboard plus pointer-lock mouse), `PlayerController` (raycast kinematic
+  character: walk 4.5 m/s, sprint 9 m/s, jump, wall slide, 0.45 m step-up, ground snap, fall-through
+  recovery, spawn waits for tiles to settle), `FollowCamera` (orbit, wall pull-in, wheel zoom), a
+  procedural `Avatar` with a walk/air cycle, and a `PlayHint` overlay. `WorldHit` now carries a surface
+  normal. BVHs are built per tile on `load-model` and freed on `dispose-model`. Replaced deprecated
+  `Clock` with `Timer`. Added ADR-005.
+- **Verified:** 26 unit tests pass: 7 controller tests on the demo city (standing, walk/sprint speed,
+  wall block, jump, rooftop landing, respawn, wait-for-ground). In the browser on Google tiles: the
+  player spawns on a Lower Manhattan rooftop (y ≈ 19.6), stays grounded, and moves with W. A raycast costs
+  0.043 ms.
+- **Not verified:** mouse-look and feel at a real frame rate. The browser pane was hidden, so rAF was
+  throttled to a few fps. This needs a human playtest.
+- **Gotcha:** a hidden browser pane throttles rendering. Also close duplicate tabs, because each one opens
+  its own billable tiles session.
+- **Next:** playtest M2 by hand, then M3 (climb and glide). Carry-overs: Google logo, the collision policy
+  check, and a CC0 character.

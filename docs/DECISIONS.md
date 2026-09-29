@@ -37,3 +37,14 @@ ever exists, it can be added as a new `WorldSource` adapter.
 the tiles. Nothing is persisted.
 **Consequences:** Collision matches what the player sees but is noisy on trees and façades. Google's
 policy fit gets re-verified in M1; the fallback is OSM footprint proxies.
+
+## ADR-005 — Raycast kinematic controller for on-foot movement (2026-09-29)
+
+**Context:** Feeding streaming photogrammetry into a physics engine means building trimesh colliders
+constantly as tiles load and unload.
+**Decision:** The on-foot controller moves using raycasts against `WorldSource` only. It slides along
+walls, steps up curbs and snaps to the ground, with `three-mesh-bvh` for speed. Rapier is deferred to M4
+(vehicles), where real dynamics matter.
+**Consequences:** It works the same on every world source and is fully unit-testable on the demo city.
+There's no physical interaction between the player and objects. Thin geometry smaller than the probe
+spacing can be missed.

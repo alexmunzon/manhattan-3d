@@ -13,7 +13,13 @@ import {
 } from 'three';
 import type { LocalFrame } from './geo';
 import { createRandom } from './random';
-import type { WorldHit, WorldSource, WorldStatus } from './WorldSource';
+import {
+  createWorldHit,
+  toWorldHit,
+  type WorldHit,
+  type WorldSource,
+  type WorldStatus,
+} from './WorldSource';
 
 /** Layout parameters for the generated grid city. */
 export interface DemoCityOptions {
@@ -50,6 +56,7 @@ export class DemoCitySource implements WorldSource {
   private readonly raycaster = new Raycaster();
   private readonly downRay: Ray;
   private readonly hits: Intersection[] = [];
+  private readonly hit = createWorldHit();
   private buildings: InstancedMesh | null = null;
   private ground: Mesh | null = null;
 
@@ -97,7 +104,7 @@ export class DemoCitySource implements WorldSource {
     this.hits.length = 0;
     this.raycaster.intersectObject(this.root, true, this.hits);
     const hit = this.hits[0];
-    return hit ? { point: hit.point, distance: hit.distance } : null;
+    return hit ? toWorldHit(hit, this.raycaster.ray, this.hit) : null;
   }
 
   heightAt(x: number, z: number): number | null {

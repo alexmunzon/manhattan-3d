@@ -11,13 +11,21 @@ import {
   Raycaster,
   type Camera,
   type Intersection,
+  type Object3D,
   type Ray,
   type WebGLRenderer,
 } from 'three';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { buildBoundsTrees, disposeBoundsTrees } from '../physics/bvh';
 import type { LocalFrame } from './geo';
 import { describeTileError } from './tileErrors';
-import type { WorldHit, WorldSource, WorldStatus } from './WorldSource';
+import {
+  createWorldHit,
+  toWorldHit,
+  type WorldHit,
+  type WorldSource,
+  type WorldStatus,
+} from './WorldSource';
 
 const DEG_TO_RAD = Math.PI / 180;
 /** Screen-space error target in pixels; higher loads coarser tiles and fewer requests. */
@@ -41,6 +49,7 @@ export class GoogleTilesSource implements WorldSource {
   private readonly raycaster = new Raycaster();
   private readonly downRay: Ray;
   private readonly hits: Intersection[] = [];
+  private readonly hit = createWorldHit();
   private readonly credits: string[] = [];
   private readonly attributionScratch: { type: string; value: unknown }[] = [];
 
@@ -69,6 +78,13 @@ export class GoogleTilesSource implements WorldSource {
     this.tiles.lruCache.maxBytesSize = CACHE_MAX_BYTES;
     this.tiles.lruCache.minBytesSize = CACHE_MIN_BYTES;
     this.tiles.setCamera(camera);
+    this.tiles.addEventListener('load-model', ({ scene }: { scene: Object3D }) => {
+      buildBoundsTrees(scene);
+    });
+    this.tiles.addEventListener('dispose-model', ({ scene }: { scene: Object3D }) => {
+      disposeBoundsTrees(scene);
+    });
+    this.raycaster.firstHitOnly = true;
 
     // ReorientationPlugin yields +x west / +z north; game space is +x east / -z north.
     this.root.rotation.y = Math.PI;
@@ -119,7 +135,7 @@ export class GoogleTilesSource implements WorldSource {
     this.hits.length = 0;
     this.raycaster.intersectObject(this.tiles.group, true, this.hits);
     const hit = this.hits[0];
-    return hit ? { point: hit.point, distance: hit.distance } : null;
+    return hit ? toWorldHit(hit, this.raycaster.ray, this.hit) : null;
   }
 
   heightAt(x: number, z: number): number | null {

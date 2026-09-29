@@ -4,19 +4,23 @@ import {
   DirectionalLight,
   Fog,
   HemisphereLight,
-  PCFShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
+  Timer,
   WebGLRenderer,
 } from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { FollowCamera } from './camera/FollowCamera';
 import { readMapsApiKey } from './config/env';
 import { SPAWN } from './config/world';
 import { AttributionLine } from './hud/attribution';
 import { el } from './hud/dom';
 import { showNotice } from './hud/notice';
+import { PlayHint } from './hud/playHint';
 import { showSetupScreen } from './hud/setupScreen';
+import { Input } from './input/Input';
+import { Avatar } from './player/Avatar';
+import { PlayerController, type MoveIntent } from './player/PlayerController';
 import { DemoCitySource } from './world/DemoCitySource';
 import { GoogleTilesSource } from './world/GoogleTilesSource';
 import { LocalFrame } from './world/geo';
@@ -25,19 +29,12 @@ import './styles.css';
 
 const SKY = new Color('#9cc3e0');
 const MAX_PIXEL_RATIO = 2;
+const MAX_FRAME_SECONDS = 1 / 20;
 const ATTRIBUTION_REFRESH_MS = 500;
-
-type Vec3Tuple = [number, number, number];
-
-/** Per-source view settings: fog range and the initial orbit camera placement. */
-const VIEW: Record<
-  'demo' | 'google',
-  { fogNear: number; fogFar: number; eye: Vec3Tuple; target: Vec3Tuple }
-> = {
-  demo: { fogNear: 300, fogFar: 1400, eye: [220, 180, 220], target: [0, 0, 0] },
-  // Street level in Lower Manhattan sits roughly 30 m below the WGS84 ellipsoid.
-  google: { fogNear: 900, fogFar: 4500, eye: [350, 260, 350], target: [0, -30, 0] },
-};
+const WHEEL_STEP_PX = 100;
+/** Hover height of the camera while street-level tiles load, so they stream at high detail. */
+const LOADING_CAMERA_HEIGHT = 120;
+const FOG = { demo: { near: 300, far: 1400 }, google: { near: 900, far: 4500 } } as const;
 
 async function start(app: HTMLElement): Promise<void> {
   const renderer = new WebGLRenderer({ antialias: true });
@@ -45,8 +42,6 @@ async function start(app: HTMLElement): Promise<void> {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFShadowMap;
   app.append(renderer.domElement);
 
   const scene = new Scene();
@@ -56,7 +51,9 @@ async function start(app: HTMLElement): Promise<void> {
   sun.position.set(-300, 400, 200);
   scene.add(sun);
 
-  const camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 20_000);
+  const camera = new PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 20_000);
+  camera.position.set(0, LOADING_CAMERA_HEIGHT, 1);
+  camera.lookAt(0, 0, 0);
 
   const hud = el('div', 'hud');
   app.append(hud);
@@ -66,17 +63,9 @@ async function start(app: HTMLElement): Promise<void> {
   const world: WorldSource = apiKey
     ? new GoogleTilesSource(frame, apiKey, renderer, camera)
     : new DemoCitySource(frame);
-  const view = apiKey ? VIEW.google : VIEW.demo;
-  scene.fog = new Fog(SKY, view.fogNear, view.fogFar);
-  camera.position.set(...view.eye);
+  const fog = apiKey ? FOG.google : FOG.demo;
+  scene.fog = new Fog(SKY, fog.near, fog.far);
   scene.add(world.root);
-
-  // Temporary free-orbit viewer; replaced by the player controller in M2.
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(...view.target);
-  controls.enableDamping = true;
-  controls.maxPolarAngle = Math.PI * 0.49;
-  controls.update();
 
   await world.load();
   if (world.status.kind === 'error') showNotice(hud, 'Map tiles unavailable', world.status.message);
@@ -88,19 +77,59 @@ async function start(app: HTMLElement): Promise<void> {
     attribution.set(world.attributions());
   }, ATTRIBUTION_REFRESH_MS);
 
-  if (import.meta.env.DEV) window.__manhattan = { renderer, world, camera };
+  const input = new Input(renderer.domElement);
+  const player = new PlayerController(world);
+  const avatar = new Avatar();
+  const followCamera = new FollowCamera(camera);
+  const hint = new PlayHint(hud);
+  const intent: MoveIntent = { forward: 0, right: 0, sprint: false, jump: false };
 
+  renderer.domElement.addEventListener(
+    'wheel',
+    (e) => {
+      followCamera.zoom(e.deltaY / WHEEL_STEP_PX);
+    },
+    { passive: true },
+  );
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  renderer.setAnimationLoop(() => {
-    controls.update();
+  if (import.meta.env.DEV) window.__manhattan = { renderer, world, camera, player };
+
+  const timer = new Timer();
+  renderer.setAnimationLoop((time: number) => {
+    timer.update(time);
+    const dt = Math.min(timer.getDelta(), MAX_FRAME_SECONDS);
+
+    if (!player.spawned) {
+      if (player.trySpawn(0, 0, dt)) scene.add(avatar.root);
+    } else {
+      readIntent(input, intent);
+      if (input.wasPressed('KeyR')) player.respawn();
+      player.update(dt, intent, followCamera.yaw);
+      avatar.root.position.copy(player.position);
+      avatar.animate(dt, player.velocity.x, player.velocity.z, player.onGround);
+      followCamera.update(dt, player.position, input.look, world);
+    }
+    hint.set(!player.spawned ? 'loading' : input.locked ? 'playing' : 'unlocked');
+
     world.update(camera);
     renderer.render(scene, camera);
+    input.endFrame();
   });
+}
+
+/** Maps held keys to a device-independent movement intent. */
+function readIntent(input: Input, out: MoveIntent): void {
+  const axis = (pos: string, neg: string): number =>
+    (input.isDown(pos) ? 1 : 0) - (input.isDown(neg) ? 1 : 0);
+  out.forward = axis('KeyW', 'KeyS');
+  out.right = axis('KeyD', 'KeyA');
+  out.sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
+  out.jump = input.wasPressed('Space');
 }
 
 const app = document.getElementById('app');
