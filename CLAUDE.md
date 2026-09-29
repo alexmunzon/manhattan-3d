@@ -30,6 +30,11 @@ hang-glide through. TypeScript + Vite + Three.js, raycast physics (no physics en
 - Open `http://127.0.0.1:5173/?headless` for automated checks. It keeps rendering and tile streaming
   alive in hidden tabs. `window.__manhattan` exposes the game in dev builds only.
 - Keep one game tab open: every tab opens its own billable Google tiles session.
+- Gameplay scenarios (`src/testing/`) run in `npm run test` on the demo city: full loop, reset
+  mid-action, seeded button mashing. In the browser: `?headless&selftest=loop|climbs|all`.
+  Add `&demo` to stay on the free demo city; without it the run uses Google tiles (one billable
+  session). Results: HUD panel and `window.__manhattan.selftest`.
+- Opening the plain dev URL loads Google tiles when `.env` has a key. Use `?demo` for free checks.
 
 ## Owner context
 

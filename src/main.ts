@@ -24,6 +24,7 @@ import { PlayHint } from './hud/playHint';
 import { showSetupScreen } from './hud/setupScreen';
 import { TeleportBar } from './hud/TeleportBar';
 import { Input } from './input/Input';
+import type { SelftestDriver } from './testing/selftest';
 import { Avatar } from './player/Avatar';
 import { Character, type CharacterInput } from './player/Character';
 import { CharacterModel } from './player/CharacterModel';
@@ -71,11 +72,13 @@ async function start(app: HTMLElement): Promise<void> {
   const hud = el('div', 'hud');
   app.append(hud);
 
-  const apiKey = readMapsApiKey();
+  // Dev-only `?demo`: the free demo city (with some climbable low buildings) even when a key is set.
+  const forceDemo = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
+  const apiKey = forceDemo ? undefined : readMapsApiKey();
   const frame = new LocalFrame(SPAWN);
   const world: WorldSource = apiKey
     ? new GoogleTilesSource(frame, apiKey, renderer, camera)
-    : new DemoCitySource(frame);
+    : new DemoCitySource(frame, forceDemo ? { minHeight: 1.6 } : {});
   const fog = apiKey ? FOG.google : FOG.demo;
   const environment = new Environment(scene, fog.near, fog.far);
   scene.add(new HemisphereLight('#dfeaf5', '#4a4038', 1.2));
@@ -123,7 +126,8 @@ async function start(app: HTMLElement): Promise<void> {
   mountControlsLegend(hud);
   const debug = new DebugOverlay(hud);
   const attribution = new AttributionLine(hud);
-  if (!apiKey) showSetupScreen(hud);
+  if (!apiKey && !forceDemo) showSetupScreen(hud);
+  const selftest = import.meta.env.DEV ? await loadSelftest(character, world, hud) : null;
 
   const intent: CharacterInput = {
     forward: 0,
@@ -169,6 +173,11 @@ async function start(app: HTMLElement): Promise<void> {
       readIntent(input, intent);
       if (input.wasPressed('KeyR')) character.reset();
       if (input.wasPressed('KeyC')) followCamera.toggleWide();
+      const scripted = selftest?.next(dt);
+      if (scripted) {
+        Object.assign(intent, scripted.input);
+        if (scripted.yaw !== undefined) followCamera.yaw = scripted.yaw;
+      }
       character.update(dt, intent, followCamera.yaw);
 
       const gliding = character.mode === 'gliding';
@@ -196,6 +205,7 @@ async function start(app: HTMLElement): Promise<void> {
         followCamera.recenter(character.facing, dt, look.x !== 0 || look.y !== 0);
       }
       followCamera.update(dt, position, look, world);
+      selftest?.observe(dt, intent, camera.position);
       if (gliding) modeHud.set('Gliding', character.speed, character.altitude);
       else modeHud.set(driving ? 'Driving' : null, character.speed, null);
     }
@@ -217,6 +227,18 @@ async function start(app: HTMLElement): Promise<void> {
   renderer.setAnimationLoop(runFrame);
 
   if (import.meta.env.DEV) window.__manhattan = { renderer, world, camera, character };
+}
+
+/** Dev-only `?selftest=<suite>`: loads the scripted gameplay runner (see src/testing/selftest.ts). */
+async function loadSelftest(
+  character: Character,
+  world: WorldSource,
+  hud: HTMLElement,
+): Promise<SelftestDriver | null> {
+  const suite = new URLSearchParams(location.search).get('selftest');
+  if (!suite) return null;
+  const { createSelftest } = await import('./testing/selftest');
+  return createSelftest(suite, character, world, hud);
 }
 
 /** Spawn point in game space: `?lat=&lon=` from a shared link if it's in Manhattan, else SPAWN. */

@@ -15,5 +15,7 @@ interface Window {
     world: import('./world/WorldSource').WorldSource;
     camera: import('three').Camera;
     character: import('./player/Character').Character;
+    /** Results of a `?selftest=` run, once it has finished. */
+    selftest?: import('./testing/scenario').ScenarioResult[];
   };
 }

@@ -114,6 +114,7 @@ export class Character {
   teleport(x: number, z: number): void {
     this.climb = null;
     this.send('reset');
+    this.parkCar();
     this.velocity.set(0, 0, 0);
     this.position.set(x, this.position.y, z);
     this.foot.spawned = false;
@@ -123,7 +124,14 @@ export class Character {
   reset(): void {
     this.climb = null;
     this.send('reset');
+    this.parkCar();
     this.foot.respawn();
+  }
+
+  /** Leaves the car where it is, stopped (it only moves while driven). */
+  private parkCar(): void {
+    this.car.speed = 0;
+    this.car.verticalSpeed = 0;
   }
 
   update(dt: number, input: CharacterInput, cameraYaw: number): void {
@@ -172,6 +180,7 @@ export class Character {
     if (input.vehicle && !airborne) {
       if (this.carPlaced && this.position.distanceTo(this.car.position) <= ENTER_DISTANCE) {
         this.velocity.set(0, 0, 0);
+        this.position.copy(this.car.position); // camera and HUD follow the car from this frame
         this.send('enterCar');
         return;
       }
