@@ -24,12 +24,13 @@ import {
   toWorldHit,
   type WorldHit,
   type WorldSource,
+  type WorldDetail,
   type WorldStatus,
 } from './WorldSource';
 
 const DEG_TO_RAD = Math.PI / 180;
 /** Screen-space error target in pixels; higher loads coarser tiles and fewer requests. */
-const ERROR_TARGET = 20;
+const ERROR_TARGET: Record<WorldDetail, number> = { high: 20, low: 40 };
 /** GPU/CPU budget for cached tiles before least-recently-used tiles are evicted. */
 const CACHE_MAX_BYTES = 350 * 1024 * 1024;
 const CACHE_MIN_BYTES = 250 * 1024 * 1024;
@@ -74,7 +75,7 @@ export class GoogleTilesSource implements WorldSource {
         height: frame.origin.alt,
       }),
     );
-    this.tiles.errorTarget = ERROR_TARGET;
+    this.tiles.errorTarget = ERROR_TARGET.high;
     this.tiles.lruCache.maxBytesSize = CACHE_MAX_BYTES;
     this.tiles.lruCache.minBytesSize = CACHE_MIN_BYTES;
     this.tiles.setCamera(camera);
@@ -127,6 +128,19 @@ export class GoogleTilesSource implements WorldSource {
     this.tiles.setResolutionFromRenderer(camera, this.renderer);
     camera.updateMatrixWorld();
     this.tiles.update();
+  }
+
+  addCamera(camera: Camera, width: number, height: number): void {
+    this.tiles.setCamera(camera);
+    this.tiles.setResolution(camera, width, height);
+  }
+
+  removeCamera(camera: Camera): void {
+    this.tiles.deleteCamera(camera);
+  }
+
+  setDetail(detail: WorldDetail): void {
+    this.tiles.errorTarget = ERROR_TARGET[detail];
   }
 
   raycast(ray: Ray, maxDistance: number): WorldHit | null {

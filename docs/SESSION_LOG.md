@@ -102,3 +102,23 @@ Append-only. One entry per session: date · milestone · changes · verified · 
 - **Testing tip:** automated browser checks should open `http://127.0.0.1:5173/?headless`.
 - **Next:** M5 HUD and polish (minimap, teleport, keycap legend, post-processing, lifting the glider
   camera). Decide on a CC0 car model (needs owner approval to download).
+
+## 2026-09-29 · M5 HUD & polish
+
+- **Changes:** Added the Quaternius Taxi (CC0) with re-pivoted spinning and steering wheels. Added the
+  photoreal `Minimap` (ortho render, scissored, north-up) with `WorldSource.addCamera`, `TeleportBar`
+  with the places list and Manhattan bounds, `?lat=&lon=` spawn links, `InfoPanel` (coords, copy link,
+  avatar colours, graphics detail), `ControlsLegend` keycaps, `DebugOverlay` (backquote), physically
+  based `Sky` that follows the camera, `BlobShadow` for the character and car, a raised glide camera
+  pivot (the wing no longer looks edge-on), C to toggle a wide camera, and `Character.teleport`. Added
+  ADR-008.
+- **Verified:** 94 unit tests pass (places/bounds, teleport parsing, heading format, plus all earlier
+  tests). In the browser (headless) on Google tiles: the HUD layout renders, and the minimap shows the
+  photoreal top-down city once the glass blur was removed from behind it. Teleporting via the bar to
+  "times square" landed at 40.75800, -73.98550 with the taxi alongside. Glided over Times Square with
+  the wing shown correctly. Debug overlay: 55–57 FPS, 253 draw calls, 580k triangles.
+- **Bug found and fixed:** the frosted-glass `backdrop-filter` blurred the WebGL minimap underneath it.
+- **Not verified:** copying to the clipboard, the low-detail setting's effect on FPS, and responsive
+  layout below 900 px.
+- **Next:** M6. Run the full loop, handle bridge coverage gaps, record the README video/GIF, do a
+  security review, and add the Google logo.

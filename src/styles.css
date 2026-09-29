@@ -153,11 +153,6 @@ body {
   color: var(--accent);
 }
 
-.play-hint__controls {
-  margin: 0;
-  font-size: 11px;
-  color: var(--text-dim);
-}
 
 .mode-hud {
   position: absolute;
@@ -183,4 +178,247 @@ body {
 
 [hidden] {
   display: none !important;
+}
+
+/* ---- M5 HUD ---- */
+
+.chip {
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+}
+
+.chip:focus-visible,
+.swatch:focus-visible,
+.teleport__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.teleport {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px - 460px));
+  min-width: 260px;
+  padding: 8px;
+}
+
+.teleport__input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.teleport__input::placeholder {
+  color: var(--text-dim);
+}
+
+.teleport__status {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11px;
+  color: #ff8a7a;
+}
+
+.teleport__status:empty {
+  display: none;
+}
+
+.minimap {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  gap: 6px;
+}
+
+.minimap__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.minimap__header .label {
+  margin: 0;
+}
+
+.minimap__heading {
+  font-size: 11px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.minimap__controls {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* The map itself is drawn by WebGL underneath this transparent box. */
+.minimap__view {
+  position: relative;
+  width: 244px;
+  height: 200px;
+  border-radius: var(--radius);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.minimap--expanded .minimap__view {
+  width: 440px;
+  height: 440px;
+}
+
+.minimap__marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 16px solid #ff5a4a;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+}
+
+.minimap__north {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.info {
+  position: absolute;
+  top: 276px;
+  right: 16px;
+  width: 244px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.minimap--expanded ~ .info {
+  display: none;
+}
+
+.info__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.info__row .label {
+  margin: 0;
+  width: 58px;
+}
+
+.info__value {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  flex-basis: 100%;
+  order: 1;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch--active {
+  border-color: var(--text);
+}
+
+.legend {
+  position: absolute;
+  left: 12px;
+  bottom: 28px;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.legend__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend__keys {
+  display: flex;
+  gap: 3px;
+  min-width: 108px;
+}
+
+.legend__action {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.keycap {
+  min-width: 24px;
+  padding: 3px 6px 4px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: #1c2328;
+  background: linear-gradient(#ffffff, #e4e8ea);
+  border-radius: 5px;
+  box-shadow:
+    0 3px 0 #9aa4aa,
+    0 4px 6px rgba(0, 0, 0, 0.35);
+}
+
+.debug {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .legend,
+  .info {
+    display: none;
+  }
 }

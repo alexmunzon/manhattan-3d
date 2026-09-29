@@ -1,6 +1,7 @@
 import {
   AnimationMixer,
   Box3,
+  Color,
   Group,
   LoopOnce,
   Mesh,
@@ -93,6 +94,17 @@ export class CharacterModel implements AvatarView {
       else this.current.timeScale = 1;
     }
     this.mixer.update(dt);
+  }
+
+  setColor(color: string): void {
+    this.root.traverse((node) => {
+      if (!(node instanceof Mesh)) return;
+      const mesh = node as Mesh;
+      const materials = (
+        Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      );
+      for (const m of materials) if ('color' in m && m.color instanceof Color) m.color.set(color);
+    });
   }
 
   dispose(): void {

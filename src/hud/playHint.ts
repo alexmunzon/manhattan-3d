@@ -1,21 +1,22 @@
 import { el } from './dom';
 
-const CONTROLS =
-  'WASD move · Shift sprint · Space jump/climb · V car · H glider (in air) · Wheel zoom · R reset · Esc release';
-
-/** Bottom-centre hint that prompts for pointer lock and lists controls. */
+/** Bottom-centre prompt shown while loading or when the mouse isn't captured. */
 export class PlayHint {
   private readonly node = el('div', 'panel play-hint');
   private readonly title = el('p', 'label');
+  private state: 'loading' | 'unlocked' | 'playing' | null = null;
 
   constructor(parent: HTMLElement) {
-    this.node.append(this.title, el('p', 'play-hint__controls', CONTROLS));
+    this.node.append(this.title);
     parent.append(this.node);
   }
 
   /** Updates the prompt from the current loading and pointer-lock state. */
   set(state: 'loading' | 'unlocked' | 'playing'): void {
+    if (state === this.state) return;
+    this.state = state;
     this.node.hidden = state === 'playing';
-    this.title.textContent = state === 'loading' ? 'Loading street level…' : 'Click to play';
+    this.title.textContent =
+      state === 'loading' ? 'Loading street level…' : 'Click to play · Esc to release mouse';
   }
 }

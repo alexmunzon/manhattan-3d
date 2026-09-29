@@ -6,5 +6,7 @@ export interface AvatarView {
   readonly root: import('three').Object3D;
   /** Sets the pose, locomotion speed (m/s), facing yaw (0 = north) and glider bank (radians). */
   update(dt: number, pose: Pose, speed: number, yaw: number, bank: number): void;
+  /** Tints the character's clothing/body colour. */
+  setColor(color: string): void;
   dispose(): void;
 }

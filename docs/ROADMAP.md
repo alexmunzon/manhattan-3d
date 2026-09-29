@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M5 — HUD & polish** (carry-overs: M1 Google logo + policy check; human playtest of M2–M4 feel; CC0 car model)
+## Current: **M6 — Release** (carry-overs: M1 Google logo + policy check; human playtest of M2–M5 feel)
 
 ## M0 — Scaffold
 
@@ -41,10 +41,10 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M5 — HUD & polish
 
-- [ ] Minimap (Manhattan outline, player, compass, heading, zoom, expand)
-- [ ] Teleport bar (address or lat/lon, clamped to Manhattan) + copy-link spawn URL
-- [ ] 3D keycap control legend; avatar color swatches
-- [ ] ACES tone mapping, sky/fog, shadows; low-spec preset; FPS/draw-call/tile debug overlay
+- [x] Minimap: top-down photoreal render of the same tiles, north-up, player arrow, heading readout, zoom, expand (Manhattan outline not drawn; used for teleport bounds instead)
+- [x] Teleport bar (18 named places or lat/lon, clamped to Manhattan; no paid geocoder) + `?lat=&lon=` spawn links with Copy link (clipboard write not verified in automation)
+- [x] 3D keycap control legend; avatar colour swatches (tints the character)
+- [x] ACES + physically based sky + horizon fog; blob contact shadows (tiles are unlit); Graphics High/Low toggle; backquote debug overlay (measured 55–57 FPS, 253 draw calls, 580k tris over Times Square)
 
 ## M6 — Release
 

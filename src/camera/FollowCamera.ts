@@ -22,10 +22,14 @@ export const FOLLOW_CAMERA = {
   recenterRate: 1.5,
 } as const;
 
+const WIDE_ZOOM_OFFSET = 6;
+
 /** Per-mode camera framing (see docs/VISUAL_SPEC.md). */
 export interface CameraRig {
   distance: number;
   fov: number;
+  /** Height of the orbit pivot above the target's feet. */
+  height: number;
 }
 
 /** Third-person orbit camera that follows a target and pulls in to avoid clipping into walls. */
@@ -40,6 +44,8 @@ export class FollowCamera {
   private readonly ray = new Ray();
   private rigDistance: number = FOLLOW_CAMERA.distance;
   private rigFov: number;
+  private rigHeight: number = FOLLOW_CAMERA.pivotHeight;
+  private pivotHeight: number = FOLLOW_CAMERA.pivotHeight;
   private zoomOffset = 0;
 
   constructor(private readonly camera: PerspectiveCamera) {
@@ -50,6 +56,12 @@ export class FollowCamera {
   setRig(rig: CameraRig): void {
     this.rigDistance = rig.distance;
     this.rigFov = rig.fov;
+    this.rigHeight = rig.height;
+  }
+
+  /** Toggles between the default framing and a wide, pulled-back view (C key). */
+  toggleWide(): void {
+    this.zoomOffset = this.zoomOffset > 0 ? 0 : WIDE_ZOOM_OFFSET;
   }
 
   /** Swings the camera behind `heading` (e.g. the glider), unless the player is looking around. */
@@ -85,7 +97,8 @@ export class FollowCamera {
       this.camera.updateProjectionMatrix();
     }
 
-    this.pivot.set(target.x, target.y + FOLLOW_CAMERA.pivotHeight, target.z);
+    this.pivotHeight += (this.rigHeight - this.pivotHeight) * blend;
+    this.pivot.set(target.x, target.y + this.pivotHeight, target.z);
     // Unit vector from the pivot back toward the camera.
     const cosPitch = Math.cos(this.pitch);
     this.back.set(

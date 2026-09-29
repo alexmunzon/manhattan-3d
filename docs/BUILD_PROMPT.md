@@ -53,7 +53,7 @@ Verify the current major version and API of each package before using it (APIs d
 | Language/build | TypeScript (`strict`), Vite                                                                                                                   |
 | Rendering      | Three.js                                                                                                                                      |
 | City data      | Google Photorealistic 3D Tiles via NASA-AMMOS [`3d-tiles-renderer`](https://github.com/NASA-AMMOS/3DTilesRendererJS) + its Google auth plugin |
-| Physics        | Rapier (`@dimforge/rapier3d-compat`): kinematic character controller, raycast vehicle                                                         |
+| Physics        | Raycast kinematic controllers for player, car and glider (ADR-005/006 superseded the original Rapier plan)                                    |
 | Raycasts       | `three-mesh-bvh` against loaded tile meshes                                                                                                   |
 | Tests          | Vitest (unit), Playwright (browser smoke, opt-in)                                                                                             |
 | Quality        | ESLint (typescript-eslint), Prettier, `gitleaks`                                                                                              |
@@ -70,7 +70,7 @@ src/
     GoogleTilesSource.ts
     DemoCitySource.ts  procedural blocks, no key, used by tests/CI
     geo.ts             lat/lon/alt <-> ECEF <-> local ENU
-  physics/             Rapier world, collision queries
+  physics/             BVH setup for fast raycasts
   player/              on-foot controller, climb, animation
   vehicles/            car, glider
   camera/              per-mode rigs, blended transitions
@@ -96,7 +96,7 @@ Photogrammetry is a visual shell, not physics. Approach:
 
 - Build BVHs for **currently loaded, high-LOD tiles near the player**, in memory only, and dispose them
   with the tile. Never write tile geometry to disk, IndexedDB, or the repo.
-- Feed nearby triangles to Rapier as trimesh colliders within a small radius (tune ~50–150 m).
+- Controllers query the world only via raycasts (ADR-005). There's no trimesh collider build.
 - Fallback: ground-snap via downward raycast if colliders aren't ready; freeze the player while the
   ground under spawn loads.
 - Document where collision is approximate (trees, overpasses, noisy façades).
@@ -165,7 +165,6 @@ Full checklists are in `docs/ROADMAP.md`. In short:
   [policies](https://developers.google.com/maps/documentation/tile/policies),
   [billing](https://developers.google.com/maps/documentation/tile/usage-and-billing). Check the current
   free tier before M1.
-- [3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS), [Rapier](https://rapier.rs/),
-  [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh), [Quaternius](https://quaternius.com/),
+- [3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS), [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh), [Quaternius](https://quaternius.com/),
   [OSM copyright](https://www.openstreetmap.org/copyright).
 - Reference game: [sf.thijs.gg](https://sf.thijs.gg/). It's for behavior and look only; none of its code or data is used.

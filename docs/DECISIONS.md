@@ -68,3 +68,14 @@ surface at its x/z is back within 3 m of that height, snap it onto that surface.
 the nearest street-level point, never a rooftop.
 **Consequences:** Streaming gaps no longer cause long falls. A real fall off a roof is unaffected,
 because the surface below a roof edge is the street, far lower.
+
+## ADR-008 — Minimap and teleport without extra paid APIs (2026-09-29)
+
+**Context:** A satellite minimap and address search would normally need more Google APIs (2D tiles,
+Geocoding). Each is billed separately and would widen what the key can do.
+**Decision:** The minimap is a second, orthographic render of the already-streamed 3D tiles, taken
+from straight above the player. Only root-tileset requests are billed, so this adds no cost. Teleport
+resolves a curated list of Manhattan places or raw lat/lon, checked against a hand-traced Manhattan
+outline.
+**Consequences:** The key stays restricted to the Map Tiles API. The minimap costs a second render
+pass (about 2x draw calls) and shows only loaded detail. There's no free-text street-address search.

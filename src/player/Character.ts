@@ -107,6 +107,19 @@ export class Character {
     return this.world.raycast(this.ray, 5_000)?.distance ?? null;
   }
 
+  /**
+   * Moves to game-space (x, z): the player waits (not simulated) until geometry there has loaded,
+   * then spawns at street level with the car alongside.
+   */
+  teleport(x: number, z: number): void {
+    this.climb = null;
+    this.send('reset');
+    this.velocity.set(0, 0, 0);
+    this.position.set(x, this.position.y, z);
+    this.foot.spawned = false;
+    this.settle = 0;
+  }
+
   reset(): void {
     this.climb = null;
     this.send('reset');

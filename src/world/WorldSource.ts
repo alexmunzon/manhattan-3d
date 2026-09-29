@@ -6,6 +6,8 @@ import type { LocalFrame } from './geo';
 export type WorldStatus =
   { kind: 'idle' } | { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
 
+export type WorldDetail = 'high' | 'low';
+
 /** A ray hit against world geometry, in game space. Reused between calls; copy to keep. */
 export interface WorldHit {
   point: Vector3;
@@ -35,6 +37,12 @@ export interface WorldSource {
   raycast(ray: Ray, maxDistance: number): WorldHit | null;
   /** Height of the topmost surface at game-space (x, z), or `null` if nothing is loaded there. */
   heightAt(x: number, z: number): number | null;
+  /** Also streams geometry for an extra camera (e.g. the minimap) rendered at width x height px. */
+  addCamera(camera: Camera, width: number, height: number): void;
+  /** Stops streaming for a camera added with {@link addCamera}. */
+  removeCamera(camera: Camera): void;
+  /** Trades visual detail for speed and bandwidth. */
+  setDetail(detail: WorldDetail): void;
   /** Data credits that must be shown on screen while this source is visible. */
   attributions(): readonly string[];
   /** Releases all GPU and CPU resources. The source is unusable afterwards. */

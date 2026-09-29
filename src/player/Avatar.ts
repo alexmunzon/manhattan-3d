@@ -30,12 +30,14 @@ export class Avatar implements AvatarView {
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: MeshStandardMaterial[] = [];
   private phase = 0;
+  private shirt: MeshStandardMaterial | null = null;
   private heading = 0;
 
   constructor() {
     this.root.name = 'avatar';
     const skin = this.material(COLORS.skin);
     const shirt = this.material(COLORS.shirt);
+    this.shirt = shirt;
     const pants = this.material(COLORS.pants);
     const pack = this.material(COLORS.pack);
 
@@ -71,6 +73,10 @@ export class Avatar implements AvatarView {
     this.phase += dt * speed * STRIDE_FREQUENCY * Math.PI;
     const swing = Math.sin(this.phase) * Math.min(1, speed / 5) * MAX_SWING;
     this.setSwing(swing, -swing, -swing * 0.8, swing * 0.8);
+  }
+
+  setColor(color: string): void {
+    this.shirt?.color.set(color);
   }
 
   dispose(): void {

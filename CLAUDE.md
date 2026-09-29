@@ -1,7 +1,7 @@
 # CLAUDE.md — Manhattan 3D
 
 Browser game: photoreal 3D Manhattan (Google Photorealistic 3D Tiles) you can walk, climb, drive and
-hang-glide through. TypeScript + Vite + Three.js + Rapier. Public portfolio repo.
+hang-glide through. TypeScript + Vite + Three.js, raycast physics (no physics engine; ADR-005/006). Public portfolio repo.
 
 ## Start of every session
 
@@ -21,9 +21,9 @@ hang-glide through. TypeScript + Vite + Three.js + Rapier. Public portfolio repo
   specific action.
 - Never report something as working or tested unless it was run this session.
 
-## Commands (valid once M0 lands)
+## Commands
 
-- `npm install` · `npm run dev` · `npm run check` (lint + typecheck + test) · `npm run test:e2e` (opt-in)
+- `npm install` · `npm run dev` · `npm run check` (lint + typecheck + test)
 
 ## Testing in a browser
 

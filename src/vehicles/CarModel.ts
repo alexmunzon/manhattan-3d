@@ -15,8 +15,25 @@ const WHEEL_POSITIONS = [
   [0.85, -1.35],
 ] as const;
 
-/** Low-poly procedural hatchback, nose toward -z. Placeholder until a CC0 car model is added. */
-export class CarModel {
+/** Visual representation of the car. Implementations: {@link TaxiModel}, {@link CarModel}. */
+export interface CarView {
+  readonly root: import('three').Object3D;
+  update(
+    dt: number,
+    x: number,
+    y: number,
+    z: number,
+    yaw: number,
+    pitch: number,
+    roll: number,
+    speed: number,
+    steer: number,
+  ): void;
+  dispose(): void;
+}
+
+/** Low-poly procedural hatchback, nose toward -z. Fallback if the taxi model fails to load. */
+export class CarModel implements CarView {
   readonly root = new Group();
   private readonly wheels: Mesh[] = [];
   private readonly frontPivots: Group[] = [];
@@ -61,7 +78,6 @@ export class CarModel {
     }
   }
 
-  /** Syncs the model to the simulated car. */
   update(
     dt: number,
     x: number,

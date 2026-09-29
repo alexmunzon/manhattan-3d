@@ -7,32 +7,37 @@ over the real city.**
 
 <!-- Gameplay video / GIF goes here at M6 -->
 
-## Features (planned for v1)
+## Features
 
-- Streaming photoreal 3D city from Google Photorealistic 3D Tiles, starting in Lower Manhattan
-- Third-person movement: sprint, jump and climb ledges
-- Drivable cars with arcade handling and a speed HUD
-- A hang glider with banking, lift and landing
-- A glass-style HUD with minimap, compass, teleport search and shareable spawn links
-- An offline demo city, so the game runs with no API key
+- Streaming photoreal 3D Manhattan from Google Photorealistic 3D Tiles
+- Third-person rigged character: walk, sprint, jump, and climb onto ledges
+- A drivable NYC taxi with arcade handling (call it to you with V)
+- A hang glider with banking, dive and flare, stall, and landing
+- A glass-style HUD: photoreal minimap, heading, a teleport bar for 18 landmarks or lat/lon,
+  shareable spawn links, avatar colours, a graphics toggle, and a debug overlay
+- Streaming-safe physics: no falling through the city while tiles refine
+- An offline procedural demo city, so the game runs and is tested with no API key
 
 ## Controls
 
-| Key     | Action                |
-| ------- | --------------------- |
-| W A S D | Move / steer          |
-| Mouse   | Look                  |
-| Shift   | Sprint / exit vehicle |
-| Space   | Jump / climb          |
-| V       | Enter vehicle         |
-| H       | Deploy glider         |
-| C       | Camera                |
-| R       | Reset to spawn        |
+| Key     | Action                                    |
+| ------- | ----------------------------------------- |
+| Click   | Capture the mouse (Esc releases it)       |
+| W A S D | Move · drive · glide (W dives, S flares)  |
+| Mouse   | Look                                      |
+| Shift   | Sprint                                    |
+| Space   | Jump · climb (facing a ledge) · handbrake |
+| V       | Enter or exit the taxi, or call it to you |
+| H       | Open or close the glider (in the air)     |
+| C       | Toggle the wide camera                    |
+| Wheel   | Zoom                                      |
+| R       | Reset to spawn                            |
+| `       | Performance overlay                       |
 
 ## Tech stack
 
 TypeScript · Vite · Three.js · [3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS) ·
-Rapier physics · three-mesh-bvh · Vitest · Playwright
+three-mesh-bvh · Vitest
 
 ## Architecture
 
@@ -40,7 +45,7 @@ Rapier physics · three-mesh-bvh · Vitest · Playwright
 flowchart LR
   Input --> State[Game state machine]
   State --> Player & Car & Glider
-  Player & Car & Glider --> Physics[Rapier physics]
+  Player & Car & Glider --> Physics[Raycast physics<br/>BVH-accelerated]
   World[WorldSource] --> Physics
   World --> Renderer[Three.js renderer]
   World -.-> Google[GoogleTilesSource]
@@ -75,7 +80,6 @@ The game starts in the offline demo city. To load real Manhattan:
 
 ```bash
 npm run check      # lint + typecheck + unit tests (never calls paid APIs)
-npm run test:e2e   # opt-in browser smoke test (arrives in M2)
 ```
 
 ## How this was built
@@ -93,7 +97,7 @@ Each milestone has explicit acceptance criteria, and nothing is marked done unti
 - 3D city imagery and geometry © Google and its data providers. Attribution is shown in-game as required.
 - The repository contains **no map data**. Tiles are streamed at runtime and never stored.
 - It contains no Apple Maps data or extraction code.
-- Asset credits are in `THIRD_PARTY_NOTICES.md` (added with the first assets).
+- Character and taxi models by Quaternius. Full credits: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## License
 

@@ -98,6 +98,18 @@ export class DemoCitySource implements WorldSource {
     // Static geometry: nothing to stream.
   }
 
+  addCamera(): void {
+    // Static geometry is visible to every camera.
+  }
+
+  removeCamera(): void {
+    // Nothing to release.
+  }
+
+  setDetail(): void {
+    // A single detail level.
+  }
+
   raycast(ray: Ray, maxDistance: number): WorldHit | null {
     this.raycaster.ray.copy(ray);
     this.raycaster.far = maxDistance;
