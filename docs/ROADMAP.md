@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M3 — Climb & glide** (open carry-overs: M1 Google logo + policy check, M2 CC0 avatar)
+## Current: **M4 — Drive** (carry-overs: M1 Google logo + policy check; human playtest of M2/M3 feel)
 
 ## M0 — Scaffold
 
@@ -25,14 +25,14 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 ## M2 — On foot
 
 - [~] WASD, sprint, jump, pointer lock, blur handling built; movement verified in unit tests + scripted browser run; mouse-look needs a human playtest
-- [~] Procedural animated mannequin (placeholder) + follow camera with wall pull-in; CC0 rigged character pending owner-approved download
+- [x] Rigged Quaternius character (idle/jog/sprint/jump/fall clips, speed-matched) + follow camera with wall pull-in; procedural mannequin kept as load-failure fallback
 - [x] Collision against tiles via BVH raycasts (0.04 ms/ray measured); fall-through recovery; R resets (unit-tested)
 
 ## M3 — Climb & glide
 
-- [ ] Contextual ledge climb with reach-height + obstruction checks
-- [ ] Glider: deploy mid-air, bank/steer, lift + speed bleed, safe landing
-- [ ] State-machine transition tests (no duplicate controllers, no stuck camera)
+- [x] Contextual ledge climb (Space at a wall): reach, height 0.6–2.4 m (3.0 m mid-air), headroom checks (unit-tested on demo city; not yet exercised on Google tiles)
+- [x] Glider (H in air): deploy needs 4 m clearance, bank/turn, dive/flare, stall, touchdown + wall crash (unit-tested; flown and landed on Google tiles)
+- [x] Pure `nextMode` state machine with transition tests; one controller active per frame; camera rigs blend by mode
 
 ## M4 — Drive
 

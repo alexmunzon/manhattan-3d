@@ -7,6 +7,7 @@ import {
   SphereGeometry,
   type BufferGeometry,
 } from 'three';
+import type { AvatarView, Pose } from './pose';
 
 const STRIDE_FREQUENCY = 1.6; // swing cycles per metre-per-second of speed
 const MAX_SWING = 0.9;
@@ -20,7 +21,7 @@ const COLORS = { skin: '#d9ad8c', shirt: '#2b6f8f', pants: '#1f2a36', pack: '#3f
  * Stylised procedural mannequin with a simple walk/run/air cycle. Faces -z (north) at yaw 0.
  * Placeholder until a CC0 rigged character is added.
  */
-export class Avatar {
+export class Avatar implements AvatarView {
   readonly root = new Group();
   private readonly leftArm = new Group();
   private readonly rightArm = new Group();
@@ -53,17 +54,17 @@ export class Avatar {
     this.root.add(torso, head, backpack, this.leftArm, this.rightArm, this.leftLeg, this.rightLeg);
   }
 
-  /** Poses the avatar for this frame from the player's velocity. */
-  animate(dt: number, vx: number, vz: number, grounded: boolean): void {
-    const speed = Math.hypot(vx, vz);
-    if (speed > 0.2) {
-      const target = Math.atan2(-vx, -vz);
-      const diff = Math.atan2(Math.sin(target - this.heading), Math.cos(target - this.heading));
-      this.heading += diff * Math.min(1, TURN_RATE * dt);
-      this.root.rotation.y = this.heading;
-    }
+  update(dt: number, pose: Pose, speed: number, yaw: number, bank: number): void {
+    const diff = Math.atan2(Math.sin(yaw - this.heading), Math.cos(yaw - this.heading));
+    this.heading += diff * Math.min(1, TURN_RATE * dt);
+    this.root.rotation.set(
+      pose === 'glide' ? -1.25 : 0,
+      this.heading,
+      pose === 'glide' ? -bank : 0,
+      'YXZ',
+    );
 
-    if (!grounded) {
+    if (pose !== 'idle' && pose !== 'run' && pose !== 'sprint') {
       this.setSwing(AIR_LEG_TUCK, -AIR_LEG_TUCK * 0.4, -AIR_ARM_RAISE, -AIR_ARM_RAISE);
       return;
     }

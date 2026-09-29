@@ -16,7 +16,17 @@ export const FOLLOW_CAMERA = {
   pullInRate: 30,
   easeOutRate: 4,
   zoomStep: 0.8,
+  /** Per-second rate for blending distance/FOV between mode rigs. */
+  rigBlendRate: 2.5,
+  /** Per-second rate at which the camera swings behind a vehicle's heading. */
+  recenterRate: 1.5,
 } as const;
+
+/** Per-mode camera framing (see docs/VISUAL_SPEC.md). */
+export interface CameraRig {
+  distance: number;
+  fov: number;
+}
 
 /** Third-person orbit camera that follows a target and pulls in to avoid clipping into walls. */
 export class FollowCamera {
@@ -28,14 +38,35 @@ export class FollowCamera {
   private readonly pivot = new Vector3();
   private readonly back = new Vector3();
   private readonly ray = new Ray();
+  private rigDistance: number = FOLLOW_CAMERA.distance;
+  private rigFov: number;
+  private zoomOffset = 0;
 
-  constructor(private readonly camera: PerspectiveCamera) {}
+  constructor(private readonly camera: PerspectiveCamera) {
+    this.rigFov = camera.fov;
+  }
+
+  /** Blends toward a new framing over a fraction of a second (no hard cuts). */
+  setRig(rig: CameraRig): void {
+    this.rigDistance = rig.distance;
+    this.rigFov = rig.fov;
+  }
+
+  /** Swings the camera behind `heading` (e.g. the glider), unless the player is looking around. */
+  recenter(heading: number, dt: number, lookActive: boolean): void {
+    if (lookActive) return;
+    const diff = Math.atan2(Math.sin(heading - this.yaw), Math.cos(heading - this.yaw));
+    this.yaw += diff * Math.min(1, FOLLOW_CAMERA.recenterRate * dt);
+  }
 
   /** Adjusts the preferred distance; positive zooms out. */
   zoom(steps: number): void {
-    this.desiredDistance = Math.min(
-      FOLLOW_CAMERA.maxDistance,
-      Math.max(FOLLOW_CAMERA.minDistance, this.desiredDistance + steps * FOLLOW_CAMERA.zoomStep),
+    this.zoomOffset = Math.min(
+      FOLLOW_CAMERA.maxDistance - FOLLOW_CAMERA.distance,
+      Math.max(
+        FOLLOW_CAMERA.minDistance - FOLLOW_CAMERA.distance,
+        this.zoomOffset + steps * FOLLOW_CAMERA.zoomStep,
+      ),
     );
   }
 
@@ -45,6 +76,14 @@ export class FollowCamera {
       FOLLOW_CAMERA.maxPitch,
       Math.max(FOLLOW_CAMERA.minPitch, this.pitch - look.y * FOLLOW_CAMERA.sensitivity),
     );
+
+    const blend = Math.min(1, FOLLOW_CAMERA.rigBlendRate * dt);
+    const goal = Math.max(FOLLOW_CAMERA.minDistance, this.rigDistance + this.zoomOffset);
+    this.desiredDistance += (goal - this.desiredDistance) * blend;
+    if (Math.abs(this.camera.fov - this.rigFov) > 0.01) {
+      this.camera.fov += (this.rigFov - this.camera.fov) * blend;
+      this.camera.updateProjectionMatrix();
+    }
 
     this.pivot.set(target.x, target.y + FOLLOW_CAMERA.pivotHeight, target.z);
     // Unit vector from the pivot back toward the camera.

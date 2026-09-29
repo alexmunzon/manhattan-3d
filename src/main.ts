@@ -10,7 +10,7 @@ import {
   Timer,
   WebGLRenderer,
 } from 'three';
-import { FollowCamera } from './camera/FollowCamera';
+import { FollowCamera, type CameraRig } from './camera/FollowCamera';
 import { readMapsApiKey } from './config/env';
 import { SPAWN } from './config/world';
 import { AttributionLine } from './hud/attribution';
@@ -19,8 +19,13 @@ import { showNotice } from './hud/notice';
 import { PlayHint } from './hud/playHint';
 import { showSetupScreen } from './hud/setupScreen';
 import { Input } from './input/Input';
+import { ModeHud } from './hud/modeHud';
 import { Avatar } from './player/Avatar';
-import { PlayerController, type MoveIntent } from './player/PlayerController';
+import { Character, type CharacterInput } from './player/Character';
+import { CharacterModel } from './player/CharacterModel';
+import type { AvatarView } from './player/pose';
+import type { GameMode } from './state/gameMode';
+import { GliderWing } from './vehicles/GliderWing';
 import { DemoCitySource } from './world/DemoCitySource';
 import { GoogleTilesSource } from './world/GoogleTilesSource';
 import { LocalFrame } from './world/geo';
@@ -34,6 +39,13 @@ const ATTRIBUTION_REFRESH_MS = 500;
 const WHEEL_STEP_PX = 100;
 /** Hover height of the camera while street-level tiles load, so they stream at high detail. */
 const LOADING_CAMERA_HEIGHT = 120;
+/** Camera framing per mode (docs/VISUAL_SPEC.md). Glider FOV widens further with speed. */
+const RIGS: Record<GameMode, CameraRig> = {
+  onFoot: { distance: 4, fov: 60 },
+  climbing: { distance: 4, fov: 60 },
+  gliding: { distance: 9, fov: 70 },
+};
+const GLIDE_FOV_PER_MPS = 0.35;
 const FOG = { demo: { near: 300, far: 1400 }, google: { near: 900, far: 4500 } } as const;
 
 async function start(app: HTMLElement): Promise<void> {
@@ -78,11 +90,23 @@ async function start(app: HTMLElement): Promise<void> {
   }, ATTRIBUTION_REFRESH_MS);
 
   const input = new Input(renderer.domElement);
-  const player = new PlayerController(world);
-  const avatar = new Avatar();
+  const character = new Character(world);
+  const avatar: AvatarView = await CharacterModel.load().catch((error: unknown) => {
+    console.warn('Character model failed to load; using placeholder', error);
+    return new Avatar();
+  });
+  const wing = new GliderWing();
+  scene.add(wing.root);
   const followCamera = new FollowCamera(camera);
   const hint = new PlayHint(hud);
-  const intent: MoveIntent = { forward: 0, right: 0, sprint: false, jump: false };
+  const modeHud = new ModeHud(hud);
+  const intent: CharacterInput = {
+    forward: 0,
+    right: 0,
+    sprint: false,
+    jump: false,
+    glider: false,
+  };
 
   renderer.domElement.addEventListener(
     'wheel',
@@ -97,39 +121,61 @@ async function start(app: HTMLElement): Promise<void> {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  if (import.meta.env.DEV) window.__manhattan = { renderer, world, camera, player };
-
   const timer = new Timer();
-  renderer.setAnimationLoop((time: number) => {
+  const runFrame = (time: number): void => {
     timer.update(time);
     const dt = Math.min(timer.getDelta(), MAX_FRAME_SECONDS);
 
-    if (!player.spawned) {
-      if (player.trySpawn(0, 0, dt)) scene.add(avatar.root);
+    const spawned = character.foot.spawned;
+    if (!spawned) {
+      if (character.foot.trySpawn(0, 0, dt)) scene.add(avatar.root);
     } else {
       readIntent(input, intent);
-      if (input.wasPressed('KeyR')) player.respawn();
-      player.update(dt, intent, followCamera.yaw);
-      avatar.root.position.copy(player.position);
-      avatar.animate(dt, player.velocity.x, player.velocity.z, player.onGround);
-      followCamera.update(dt, player.position, input.look, world);
+      if (input.wasPressed('KeyR')) character.reset();
+      character.update(dt, intent, followCamera.yaw);
+
+      const gliding = character.mode === 'gliding';
+      const { position } = character;
+      const bank = character.glider.bank;
+      avatar.root.position.copy(position);
+      avatar.update(dt, character.pose, character.speed, character.facing, bank);
+      wing.update(gliding, position.x, position.y, position.z, character.facing, bank);
+
+      const rig = RIGS[character.mode];
+      followCamera.setRig(
+        gliding ? { ...rig, fov: rig.fov + character.speed * GLIDE_FOV_PER_MPS } : rig,
+      );
+      const look = input.look;
+      if (gliding) followCamera.recenter(character.facing, dt, look.x !== 0 || look.y !== 0);
+      followCamera.update(dt, position, look, world);
+      modeHud.set(gliding ? 'Gliding' : null, character.speed, character.altitude);
     }
-    hint.set(!player.spawned ? 'loading' : input.locked ? 'playing' : 'unlocked');
+    hint.set(!spawned ? 'loading' : input.locked ? 'playing' : 'unlocked');
 
     world.update(camera);
     renderer.render(scene, camera);
     input.endFrame();
-  });
+  };
+  renderer.setAnimationLoop(runFrame);
+
+  if (import.meta.env.DEV) {
+    // Lets automated checks advance the game even when the tab is hidden and rAF is paused.
+    const tick = (): void => {
+      runFrame(performance.now());
+    };
+    window.__manhattan = { renderer, world, camera, character, tick };
+  }
 }
 
 /** Maps held keys to a device-independent movement intent. */
-function readIntent(input: Input, out: MoveIntent): void {
+function readIntent(input: Input, out: CharacterInput): void {
   const axis = (pos: string, neg: string): number =>
     (input.isDown(pos) ? 1 : 0) - (input.isDown(neg) ? 1 : 0);
   out.forward = axis('KeyW', 'KeyS');
   out.right = axis('KeyD', 'KeyA');
   out.sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
   out.jump = input.wasPressed('Space');
+  out.glider = input.wasPressed('KeyH');
 }
 
 const app = document.getElementById('app');

@@ -15,7 +15,7 @@ import {
   type Ray,
   type WebGLRenderer,
 } from 'three';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { buildBoundsTrees, disposeBoundsTrees } from '../physics/bvh';
 import type { LocalFrame } from './geo';
 import { describeTileError } from './tileErrors';

@@ -62,3 +62,24 @@ Append-only. One entry per session: date · milestone · changes · verified · 
   its own billable tiles session.
 - **Next:** playtest M2 by hand, then M3 (climb and glide). Carry-overs: Google logo, the collision policy
   check, and a CC0 character.
+
+## 2026-09-29 · M3 Climb & glide (+ M2 character)
+
+- **Changes:** Added the Quaternius "Animated Base Character" (`public/models/character.glb`, credited in
+  `THIRD_PARTY_NOTICES.md`) through `CharacterModel`: normalised to 1.8 m, crossfaded clips, and a
+  speed-matched run/sprint. Added `AvatarView`/`Pose`. Added `findLedge` (wall, reach, height and
+  headroom probes). `GliderController` is an arcade glide-path model: it settles at ~16 m/s, dives and
+  flares, banks into turns, stalls, lands, and crashes into walls. `Character` owns the mode and routes
+  to one controller; `gameMode.ts` is a pure transition table. Added `GliderWing` (blue delta wing),
+  `ModeHud` (mph and altitude), per-mode camera rigs with FOV blending and glide recentering, a dev-only
+  `__manhattan.tick()` for driving frames while the tab is hidden, and `resolve.dedupe` for three.
+  Imports are now `three/addons/*`.
+- **Verified:** 48 unit tests pass (ledge, climb flow, glider physics, glider deploy/land/reset, mode
+  table). In the browser on Google tiles: the character renders at the correct scale with the idle clip;
+  glide deploy at +80 m reads ~25–28 mph; it flew and landed on a rooftop at y = 67 m and returned to
+  idle on foot. The duplicate-three warning is gone.
+- **Not verified:** climbing on Google photogrammetry (the ledge probes may be noisy on real façades),
+  and feel at 60 fps. Needs a human playtest.
+- **Known polish:** from directly behind, the glider wing looks edge-on (a thin line). Lift the camera
+  during glide in M5.
+- **Next:** M4 Drive (the `Driving_Loop` clip already exists in the character file).
