@@ -31,6 +31,9 @@ const STOPPED = 0.5;
 const LIFT_HEIGHT = 40;
 const WIDE_SEARCH_RADIUS = 150;
 const SEARCH_SECONDS = 20;
+/** After a scripted long move, keep the player on the floor while tiles there sharpen. */
+const SETTLE_SECONDS = 2;
+const SETTLE_PROBE_LIFT = 4;
 /** Lower Manhattan streets slope; street spots may sit this far above or below spawn. */
 const STREET_GRADE = 3;
 
@@ -143,6 +146,7 @@ function walkToClimbableWall(plan: Plan): Step {
   let leg = 0;
   let moved = 0;
   let nextSearch = 0;
+  let settleUntil = 0;
   /** Distant tiles sharpen after spawn, so a failed search is retried for a while. */
   const search = (ctx: ScenarioContext): void => {
     const c = ctx.character;
@@ -152,9 +156,19 @@ function walkToClimbableWall(plan: Plan): Step {
     const far = streetGrid(ctx.world, c.position, ctx.spawn.y, WIDE_SEARCH_RADIUS);
     plan.wall = findWalls(ctx.world, far, 15, 400).find((w) => w.climbable);
     if (!plan.wall) return;
+    // Scripted move to the far street spot. Its height came from blurry distant tiles, so hold
+    // the player on the current floor while tiles there sharpen, then search again up close.
     moved = horizontal(c.position, plan.wall.origin);
     const o = plan.wall.origin;
     c.foot.placeAt(o.x, o.y, o.z);
+    plan.wall = undefined;
+    settleUntil = ctx.t + SETTLE_SECONDS;
+    nextSearch = settleUntil;
+  };
+  const settle = (ctx: ScenarioContext): void => {
+    const c = ctx.character;
+    const floor = surfaceBelow(ctx.world, c.position, c.position.y + SETTLE_PROBE_LIFT);
+    if (floor !== null) c.foot.placeAt(c.position.x, floor, c.position.z);
   };
   return {
     name: 'walk to a climbable wall',
@@ -163,16 +177,21 @@ function walkToClimbableWall(plan: Plan): Step {
       leg = 0;
       moved = 0;
       nextSearch = 0;
+      settleUntil = 0;
       plan.wall = undefined;
       return undefined;
     },
     tick: (ctx) => {
+      if (ctx.t < settleUntil) {
+        settle(ctx);
+        return IDLE;
+      }
       if (!plan.wall && ctx.t >= nextSearch) {
         nextSearch = ctx.t + 2;
         search(ctx);
       }
       const wall = plan.wall;
-      if (!wall) return ctx.t > SEARCH_SECONDS ? 'done' : IDLE;
+      if (!wall) return ctx.t > SEARCH_SECONDS + SETTLE_SECONDS ? 'done' : IDLE;
       if (leg === 0) {
         if (walkToward(ctx.character, wall.origin) !== 'done') {
           return walkToward(ctx.character, wall.origin);
@@ -212,24 +231,31 @@ function streetGrid(
 
 /** Keeps walking into the wall: the player must stop in front of it, not pass through. */
 function wallStop(plan: Plan): Step {
-  return hold(
-    'walk into the wall and stop',
-    0.8,
-    { forward: 1 },
-    {
-      yaw: () => plan.wall?.yaw ?? 0,
-      check: (ctx) => {
-        const c = ctx.character;
-        // Real façades curve, so the player may slide a little before stopping: look ±45°.
-        const yaw = plan.wall?.yaw ?? 0;
-        const fan = [-2, -1, 0, 1, 2].map((k) => yaw + (k * Math.PI) / 8);
-        const ahead = Math.min(...fan.map((y) => clearance(ctx.world, c.position, y, 2)));
-        if (ahead > 0.9) return `wall is ${ahead.toFixed(2)} m away: walked through or bounced off`;
-        if (c.foot.speed > STOPPED) return `still moving at ${c.foot.speed.toFixed(1)} m/s`;
-        return undefined;
-      },
+  const SECONDS = 0.8;
+  let from = new Vector3();
+  let face = 0;
+  return {
+    name: 'walk into the wall and stop',
+    timeout: SECONDS + 1,
+    begin: (ctx) => {
+      from = ctx.character.position.clone();
+      face = clearance(ctx.world, from, plan.wall?.yaw ?? 0, 2);
+      return face >= 2 ? 'no wall ahead to walk into' : undefined;
     },
-  );
+    tick: (ctx) => (ctx.t >= SECONDS ? 'done' : { input: { forward: 1 }, yaw: plan.wall?.yaw }),
+    // Photogrammetry reshapes a little as tiles refine, so judge by where the wall face was when
+    // the step began: the player must stop, and must not end up past that face.
+    check: (ctx) => {
+      const c = ctx.character;
+      const forward = forwardOf(plan.wall?.yaw ?? 0);
+      const progress = c.position.clone().sub(from).dot(forward);
+      if (progress > face) {
+        return `walked ${progress.toFixed(2)} m, past the wall face ${face.toFixed(2)} m ahead`;
+      }
+      if (c.foot.speed > STOPPED) return `still moving at ${c.foot.speed.toFixed(1)} m/s`;
+      return undefined;
+    },
+  };
 }
 
 /** Presses Space at the wall and waits for the climb to finish on top. */
@@ -269,7 +295,8 @@ function dropToStreet(plan: Plan): Step {
     timeout: 5,
     tick: (ctx) => {
       const c = ctx.character;
-      const down = c.position.y - ctx.spawn.y < 0.5 && c.foot.onGround && ctx.t > 0.3;
+      // Back at the height the climb started from (streets slope, so not the spawn height).
+      const down = c.position.y - plan.start.y < 0.5 && c.foot.onGround && ctx.t > 0.3;
       return down ? 'done' : { input: { forward: 1 }, yaw: (plan.wall?.yaw ?? 0) + Math.PI };
     },
     check: standingCheck,
