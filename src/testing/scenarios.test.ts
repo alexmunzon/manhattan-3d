@@ -1,4 +1,4 @@
-import type { Vector3 } from 'three';
+import { Ray, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { SPAWN } from '../config/world';
 import { Character } from '../player/Character';
@@ -60,5 +60,24 @@ describe('gameplay scenarios on the demo city', () => {
   it('C: 20 s of button mashing never breaks a per-frame rule', async () => {
     const result = await play(buttonMash());
     expect(result.passed, summary(result)).toBe(true);
+  });
+
+  it('the walk-through check catches a player dragged through a wall', async () => {
+    const world = await mixedCity();
+    const character = new Character(world);
+    for (let t = 0; !character.trySpawn(DT); t += DT) if (t > 5) throw new Error('no spawn');
+    const wall = world.raycast(new Ray(new Vector3(0, 1, 24), new Vector3(1, 0, 0)), 50);
+    if (!wall) throw new Error('expected a wall east of the street');
+    character.foot.placeAt(wall.point.x - 1, 0, 24);
+    const scenario: Scenario = {
+      name: 'dragged east',
+      steps: [{ name: 'drag', timeout: 2, tick: (ctx) => (ctx.t > 0.5 ? 'done' : { input: {} }) }],
+    };
+    const run = new ScenarioRun(scenario, character, world, character.position);
+    for (let frame = run.next(DT); frame; frame = run.next(DT)) {
+      character.position.x += 0.1; // move without physics, straight through the wall
+      run.observe(DT, frame.input);
+    }
+    expect(run.result.violations.map((v) => v.rule)).toContain('walked-through');
   });
 });

@@ -69,6 +69,8 @@ export interface StepResult {
 export interface Violation {
   rule: string;
   detail: string;
+  /** The last frames before it, oldest first: "y/ground?/floor below from 1 m up (Δ to feet)". */
+  trace: string[];
   time: number;
   mode: GameMode;
   position: [number, number, number];
@@ -97,8 +99,18 @@ export const LIMITS = {
   stuckWindowSeconds: 1,
   stuckPlayerMove: 2,
   stuckCameraMove: 0.25,
+  /** Frame-to-frame moves longer than this are teleports (resets, scripted moves), not walking. */
+  maxTunnelStep: 2,
   maxViolations: 20,
 } as const;
+
+/** Heights above the feet where a frame's movement must not cross a wall (above curbs and steps). */
+const TUNNEL_PROBE_HEIGHTS = [1.0, 1.6] as const;
+const WALL_NORMAL_MAX_Y = 0.6;
+const AHEAD_PROBE = 1.5;
+const AHEAD_HISTORY = 10;
+/** Frames of state kept so each violation shows what led up to it. */
+const TRACE_FRAMES = 12;
 
 const MODES: readonly GameMode[] = ['onFoot', 'climbing', 'gliding', 'driving'];
 const PROBE_DISTANCE = 5_000;
@@ -114,17 +126,27 @@ class InvariantMonitor {
   private readonly trail: { time: number; player: Vector3; camera: Vector3 }[] = [];
   /** Rules currently in violation, so one episode is reported once, not every frame. */
   private readonly active = new Set<string>();
+  private readonly lastPosition = new Vector3();
+  private lastMode: GameMode;
+  /** What was just ahead of the player in recent frames (m, or "-" for nothing). */
+  private readonly ahead: string[] = [];
+  private readonly dir = new Vector3();
+  private readonly trace: string[] = [];
+  private readonly probe = new Ray(new Vector3(), new Vector3(0, -1, 0));
 
   constructor(
     private readonly character: Character,
     private readonly world: WorldSource,
   ) {
     this.lastCar.copy(character.car.position);
+    this.lastPosition.copy(character.position);
+    this.lastMode = character.mode;
   }
 
   observe(dt: number, time: number, input: CharacterInput, camera?: Vector3): void {
     const c = this.character;
     const driving = c.mode === 'driving';
+    this.recordTrace(time);
 
     this.rule('one-mode', !MODES.includes(c.mode), time, `unknown mode "${c.mode}"`);
     const finite = [...c.position.toArray(), ...c.velocity.toArray()].every(Number.isFinite);
@@ -161,7 +183,60 @@ class InvariantMonitor {
     );
     this.lastCar.copy(c.car.position);
 
+    this.observeTunnel(time);
     if (camera) this.observeCamera(dt, time, camera);
+  }
+
+  private recordTrace(time: number): void {
+    const c = this.character;
+    this.probe.origin.set(c.position.x, c.position.y + 1, c.position.z);
+    const floor = this.world.raycast(this.probe, 3);
+    const below = floor ? (floor.point.y - c.position.y).toFixed(2) : '-';
+    this.trace.push(
+      `${time.toFixed(2)}s ${c.mode} y=${c.position.y.toFixed(2)} ` +
+        `${c.foot.onGround ? 'ground' : 'air'} floorΔ=${below}`,
+    );
+    if (this.trace.length > TRACE_FRAMES) this.trace.shift();
+  }
+
+  /**
+   * Walked (or drove) through a wall: this frame's move crossed a wall surface. The detail lists
+   * what was just ahead in the frames before: a wall seen there means collision let the player
+   * through; nothing seen means the geometry was missing (e.g. a tile swapping detail).
+   */
+  private observeTunnel(time: number): void {
+    const c = this.character;
+    const from = this.lastPosition;
+    this.dir.set(c.position.x - from.x, 0, c.position.z - from.z);
+    const step = this.dir.length();
+    const walking = (c.mode === 'onFoot' || c.mode === 'driving') && c.mode === this.lastMode;
+    let crossed: string | null = null;
+    if (walking && step > 1e-4 && step < LIMITS.maxTunnelStep) {
+      this.dir.divideScalar(step);
+      for (const height of TUNNEL_PROBE_HEIGHTS) {
+        this.ray.origin.set(from.x, from.y + height, from.z);
+        this.ray.direction.copy(this.dir);
+        const hit = this.world.raycast(this.ray, step);
+        if (!hit || Math.abs(hit.normal.y) >= WALL_NORMAL_MAX_Y) continue;
+        crossed =
+          `crossed a wall at ${height} m moving ${step.toFixed(2)} m in one frame; ` +
+          `ahead in previous frames: [${this.ahead.join(' ')}]`;
+        break;
+      }
+    }
+    this.rule('walked-through', crossed !== null, time, crossed ?? '');
+
+    // Record what is just ahead now, along the direction of travel.
+    if (step > 1e-4) {
+      this.ray.origin.set(c.position.x, c.position.y + 1, c.position.z);
+      this.ray.direction.copy(this.dir.normalize());
+      const hit = this.world.raycast(this.ray, AHEAD_PROBE);
+      this.ahead.push(hit ? hit.distance.toFixed(2) : '-');
+      if (this.ahead.length > AHEAD_HISTORY) this.ahead.shift();
+    }
+    this.ray.direction.set(0, -1, 0);
+    this.lastPosition.copy(c.position);
+    this.lastMode = c.mode;
   }
 
   private observeCamera(dt: number, time: number, camera: Vector3): void {
@@ -208,6 +283,7 @@ class InvariantMonitor {
       time: round(time),
       mode: this.character.mode,
       position: [round(p.x), round(p.y), round(p.z)],
+      trace: [...this.trace],
     });
   }
 }

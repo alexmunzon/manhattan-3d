@@ -74,6 +74,9 @@ export class DemoCitySource implements WorldSource {
     return this.currentStatus;
   }
 
+  /** Static geometry never streams. */
+  readonly streaming = false;
+
   load(): Promise<void> {
     if (this.currentStatus.kind === 'ready') return Promise.resolve();
     const { blocksPerSide, blockSize, streetWidth } = this.options;

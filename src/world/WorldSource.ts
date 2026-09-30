@@ -28,6 +28,8 @@ export interface WorldSource {
   /** Geographic anchor of game space. */
   readonly frame: LocalFrame;
   readonly status: WorldStatus;
+  /** True while tiles are still downloading or being parsed (geometry may change shortly). */
+  readonly streaming: boolean;
 
   /** Loads the initial area around the frame origin. */
   load(): Promise<void>;

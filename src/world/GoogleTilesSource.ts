@@ -95,6 +95,10 @@ export class GoogleTilesSource implements WorldSource {
     this.downRay.direction.set(0, -1, 0);
   }
 
+  get streaming(): boolean {
+    return this.tiles.loadProgress < 1;
+  }
+
   get status(): WorldStatus {
     return this.currentStatus;
   }

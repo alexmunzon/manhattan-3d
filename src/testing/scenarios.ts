@@ -31,8 +31,9 @@ const STOPPED = 0.5;
 const LIFT_HEIGHT = 40;
 const WIDE_SEARCH_RADIUS = 150;
 const SEARCH_SECONDS = 20;
-/** After a scripted long move, keep the player on the floor while tiles there sharpen. */
-const SETTLE_SECONDS = 2;
+/** After a scripted move, wait for this long with no tiles streaming (at most the max). */
+const SETTLE_QUIET_SECONDS = 0.5;
+const SETTLE_MAX_SECONDS = 10;
 const SETTLE_PROBE_LIFT = 4;
 /** Lower Manhattan streets slope; street spots may sit this far above or below spawn. */
 const STREET_GRADE = 3;
@@ -86,6 +87,30 @@ function walkToward(c: Character, target: Vector3, within = 0.3): Command | 'don
   const d = target.clone().sub(c.position).setY(0);
   if (d.length() < within) return 'done';
   return { input: { forward: 1 }, yaw: yawToward(d) };
+}
+
+/**
+ * After a scripted move: keeps the player on the current floor until tiles there stop streaming,
+ * the way the game's own teleport waits before spawning. Real players never arrive mid-download.
+ */
+function settler(): { start(t: number): void; busy(ctx: ScenarioContext): boolean } {
+  let started = 0;
+  let quietSince = 0;
+  return {
+    start(t) {
+      started = t;
+      quietSince = t;
+    },
+    busy(ctx) {
+      if (ctx.world.streaming) quietSince = ctx.t;
+      const settled = ctx.t - quietSince >= SETTLE_QUIET_SECONDS;
+      if (settled || ctx.t - started > SETTLE_MAX_SECONDS) return false;
+      const c = ctx.character;
+      const floor = surfaceBelow(ctx.world, c.position, c.position.y + SETTLE_PROBE_LIFT);
+      if (floor !== null) c.foot.placeAt(c.position.x, floor, c.position.z);
+      return true;
+    },
+  };
 }
 
 const horizontal = (a: Vector3, b: Vector3): number => Math.hypot(a.x - b.x, a.z - b.z);
@@ -146,7 +171,8 @@ function walkToClimbableWall(plan: Plan): Step {
   let leg = 0;
   let moved = 0;
   let nextSearch = 0;
-  let settleUntil = 0;
+  const settle = settler();
+  let settling = false;
   /** Distant tiles sharpen after spawn, so a failed search is retried for a while. */
   const search = (ctx: ScenarioContext): void => {
     const c = ctx.character;
@@ -162,36 +188,32 @@ function walkToClimbableWall(plan: Plan): Step {
     const o = plan.wall.origin;
     c.foot.placeAt(o.x, o.y, o.z);
     plan.wall = undefined;
-    settleUntil = ctx.t + SETTLE_SECONDS;
-    nextSearch = settleUntil;
-  };
-  const settle = (ctx: ScenarioContext): void => {
-    const c = ctx.character;
-    const floor = surfaceBelow(ctx.world, c.position, c.position.y + SETTLE_PROBE_LIFT);
-    if (floor !== null) c.foot.placeAt(c.position.x, floor, c.position.z);
+    settle.start(ctx.t);
+    settling = true;
   };
   return {
     name: 'walk to a climbable wall',
-    timeout: 60,
+    timeout: 70,
     begin: () => {
       leg = 0;
       moved = 0;
       nextSearch = 0;
-      settleUntil = 0;
+      settling = false;
       plan.wall = undefined;
       return undefined;
     },
     tick: (ctx) => {
-      if (ctx.t < settleUntil) {
-        settle(ctx);
-        return IDLE;
+      if (settling) {
+        if (settle.busy(ctx)) return IDLE;
+        settling = false;
+        nextSearch = ctx.t;
       }
       if (!plan.wall && ctx.t >= nextSearch) {
         nextSearch = ctx.t + 2;
         search(ctx);
       }
       const wall = plan.wall;
-      if (!wall) return ctx.t > SEARCH_SECONDS + SETTLE_SECONDS ? 'done' : IDLE;
+      if (!wall) return ctx.t > SEARCH_SECONDS + SETTLE_MAX_SECONDS ? 'done' : IDLE;
       if (leg === 0) {
         if (walkToward(ctx.character, wall.origin) !== 'done') {
           return walkToward(ctx.character, wall.origin);
@@ -327,18 +349,43 @@ function enterTaxi(): Step {
   return { ...step, tick: (ctx) => (ctx.character.mode === 'driving' ? 'done' : step.tick(ctx)) };
 }
 
-/** Full throttle. Scripted: points the taxi down the clearest street (steering has unit tests). */
+/**
+ * Full throttle, steering toward the clearest street like a player would. If the taxi is parked
+ * nose-in to something, it first backs out for a second while steering.
+ */
 function drive(plan: Plan, seconds: number): Step {
+  const REVERSE_SECONDS = 1;
+  let target = 0;
+  let nextAim = 0;
+  let reverseUntil = -1;
+  let driveFrom = 0;
   return {
-    name: `drive for ${seconds} s (W)`,
-    timeout: seconds + 1,
+    name: `drive for ${seconds} s (W, steering)`,
+    timeout: seconds + REVERSE_SECONDS + 2,
     begin: (ctx) => {
-      const car = ctx.character.car;
-      car.yaw = clearestHeading(ctx.world, car.position).yaw;
-      plan.start = car.position.clone();
+      plan.start = ctx.character.car.position.clone();
+      nextAim = 0;
+      reverseUntil = -1;
+      driveFrom = 0;
       return undefined;
     },
-    tick: (ctx) => (ctx.t >= seconds ? 'done' : { input: { forward: 1 } }),
+    tick: (ctx) => {
+      const car = ctx.character.car;
+      if (ctx.t >= nextAim) {
+        nextAim = ctx.t + 0.5;
+        target = clearestHeading(ctx.world, car.position).yaw;
+      }
+      const diff = Math.atan2(Math.sin(target - car.yaw), Math.cos(target - car.yaw));
+      // Positive steer turns clockwise (yaw decreases), so steer against the heading error.
+      const steer = Math.max(-1, Math.min(1, -diff * 1.5));
+      const stuck = reverseUntil < 0 && ctx.t > 0.5 && Math.abs(car.speed) < STOPPED;
+      if (stuck) {
+        reverseUntil = ctx.t + REVERSE_SECONDS;
+        driveFrom = reverseUntil;
+      }
+      if (ctx.t < reverseUntil) return { input: { forward: -1, right: -steer } };
+      return ctx.t - driveFrom >= seconds ? 'done' : { input: { forward: 1, right: steer } };
+    },
     check: (ctx) => {
       const c = ctx.character;
       const travelled = horizontal(c.car.position, plan.start);
@@ -347,6 +394,7 @@ function drive(plan: Plan, seconds: number): Step {
       if (!c.car.onGround) return 'wheels are off the ground';
       return undefined;
     },
+    note: () => (reverseUntil > 0 ? 'backed out first: taxi was parked nose-in' : undefined),
   };
 }
 
@@ -376,10 +424,14 @@ function exitTaxi(): Step {
 
 /** Scripted: stands the player on a tall roof (the demo city has no stairs). */
 function goToRoof(plan: Plan): Step {
+  const settle = settler();
+  let settledAt = -1;
   return {
     name: 'go up to a tall roof (scripted)',
-    timeout: 1,
+    timeout: SETTLE_MAX_SECONDS + 2,
     begin: (ctx) => {
+      settle.start(0);
+      settledAt = -1;
       plan.roof = findRoof(ctx.world, ctx.character.position, ctx.spawn.y);
       const roof = plan.roof;
       if (!roof) return 'no flat roof 25 m+ tall within 200 m';
@@ -387,7 +439,11 @@ function goToRoof(plan: Plan): Step {
       c.foot.placeAt(roof.top.x, roof.top.y, roof.top.z);
       return undefined;
     },
-    tick: (ctx) => (ctx.t >= 0.5 ? 'done' : IDLE),
+    tick: (ctx) => {
+      if (settle.busy(ctx)) return IDLE;
+      if (settledAt < 0) settledAt = ctx.t;
+      return ctx.t - settledAt >= 0.5 ? 'done' : IDLE;
+    },
     check: standingCheck,
   };
 }
@@ -598,13 +654,15 @@ export function facadeClimbs(count = 10): Scenario {
 }
 
 function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
-  let phase: 'walk' | 'jumped' | 'climbing' | 'skip' = 'walk';
+  let phase: 'settle' | 'walk' | 'jumped' | 'climbing' | 'skip' = 'settle';
+  const settle = settler();
+  let walkFrom = 0;
   let jumpedAt = 0;
   let climbed = false;
   let from = new Vector3();
   return {
     name: `façade ${i + 1}`,
-    timeout: 8,
+    timeout: 8 + SETTLE_MAX_SECONDS,
     begin: (ctx) => {
       const wall = spot();
       climbed = false;
@@ -612,7 +670,8 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
         phase = 'skip';
         return undefined;
       }
-      phase = 'walk';
+      phase = 'settle';
+      settle.start(0);
       // Scripted: stand 2 m back from the wall on the street, then walk up to it.
       const c = ctx.character;
       if (c.mode !== 'onFoot') c.reset();
@@ -631,8 +690,13 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
       const wall = spot();
       const c = ctx.character;
       if (phase === 'skip' || !wall) return 'done';
+      if (phase === 'settle') {
+        if (settle.busy(ctx)) return IDLE;
+        phase = 'walk';
+        walkFrom = ctx.t;
+      }
       if (phase === 'walk') {
-        if (clearance(ctx.world, c.position, wall.yaw, 2) > 0.6 && ctx.t < 4) {
+        if (clearance(ctx.world, c.position, wall.yaw, 2) > 0.6 && ctx.t - walkFrom < 4) {
           return { input: { forward: 1 }, yaw: wall.yaw };
         }
         phase = 'jumped';
