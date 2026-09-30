@@ -148,3 +148,35 @@ Append-only. One entry per session: date · milestone · changes · verified · 
   a key. 19 Google sessions this session, about $0.11 ($6 per 1,000 root requests per Google's list).
 - **Next:** one Google `selftest=loop` run to finish the loop; then bridges, security review, collision
   policy ADR, README/GIF, Google logo (owner supplies the file).
+
+## 2026-09-30 · M6 Release (part 2): Google loop closed, bridges, policy, security
+
+- **Changes:** Full loop now passes on Google tiles (all 15 steps, no violations). HUD toasts: "no room
+  for the taxi" and "nothing to stand on there" (fall-out-of-world rescue, on foot and in the car).
+  Streaming-hole rescue (`floorAboveFeet`) falls back to the shared probe ring so a tile seam can't
+  swallow its centre ray. Wall survey probes at knee height too and stands where the body stops. New
+  `?selftest=bridge` suite walks the Brooklyn Bridge deck both ways (skipped with a note on the demo
+  city). ADR-009 records the Map Tiles policy review. README: hero/screenshot placeholders with
+  recording steps, selftest section, policy note. THIRD_PARTY_NOTICES lists runtime libraries.
+- **Test-script bugs fixed (not game bugs):** drive check read `onGround` on one frame (car hops 0.05 s
+  over real curbs; now fails only past 1 s airborne); walk step needed a 10 cm arrival that a plinth
+  made impossible (now "held by the wall" counts); `findWalls` sorted by a distance read from the
+  reused raycast hit after other casts (contract now documented on `WorldSource.raycast`); the bridge
+  drop-in snapped to the river before the deck tile loaded (now hovers until streaming settles);
+  vitest `toBeCloseTo` accepts `null` as 0, so floor assertions now guard against null first.
+- **Game bugs fixed (each with a regression test failing on the old code):** silent taxi call with no
+  parking spot; single-ray hole rescue on a seam; silent 150 m fall rescue.
+- **Verified this session:** 115 tests green; gitleaks full history clean; `.env` never tracked;
+  `npm audit` 0 vulnerabilities; no key-shaped strings tracked. Google: loop 15/15; climbs 10 walls,
+  0 climbable, 0 bad climbs; Brooklyn Bridge deck 39 m above the river, walked 172 m toward Brooklyn
+  and 366 m back, no falls or rescues. Taxi toast verified in the browser on the demo city.
+- **Not verified:** the fall-out-of-world toast on Google (unit-tested only); hero GIF and screenshots
+  (owner records); Google logo (owner supplies the file); the 172 m Brooklyn-bound walk was slower
+  than sprint speed, most likely the robot's steering near the deck edge, not checked further.
+- **Loose ends:** ledges between 0.45 m (step height) and 0.6 m (climb minimum) are neither stepped
+  nor climbed (a jump clears them); walking on the river surface is possible after a fall from the
+  deck (the water mesh is flat and walkable); ADR-009 asks Google in writing before any hosted release.
+- **Cost:** 7 Google sessions, about $0.04 (one unplanned: the preview tool opens the plain dev URL;
+  open `?demo` first).
+- **Next:** owner items (key regenerated?, logo file, git email, repo name), then wire the logo into
+  the attribution line, record media, final `npm run check`, first push with permission.

@@ -54,9 +54,11 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
       (2026-09-30), no per-frame violations
 - [x] Scripted gameplay selftest (`src/testing/`): full loop, reset mid-action, button mashing,
       façade climb check; per-frame checks (fall-through, walk-through, stuck climb, car, camera)
-- [~] Climbing on real façades: knee-high ledges, reach 1.1 m, platform check (no bollards) unit-tested;
-  on Google 0–2 of 10 nearby walls climbable, no bad climbs; platform check not yet re-measured on Google
-- [ ] Bridges: missing spans stop the player safely with a visible notice
+- [x] Climbing on real façades: knee-high ledges, reach 1.1 m, platform check (no bollards) unit-tested.
+      Re-measured on Google 2026-09-30: 10 walls, 0 climbable, 0 bad climbs; stage-by-stage probe of 14 walls
+      showed the platform check rejected none (façades too tall, lumpy faces, lips, one 0.57 m step)
+- [x] Bridges: Brooklyn Bridge deck exists in the tiles (39 m above the river); `?selftest=bridge` walks it
+      both ways on Google with no falls (2026-09-30). Falling out of the world anywhere now shows a HUD notice
 - [~] README gameplay video/GIF + screenshots: placeholders with recording steps written; owner records
   the media. THIRD_PARTY_NOTICES complete (assets + runtime libraries; logo row pending the file)
 - [x] Security review: gitleaks over the full history clean, `.env` never tracked, `npm audit` 0
