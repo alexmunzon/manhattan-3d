@@ -122,3 +122,29 @@ Append-only. One entry per session: date · milestone · changes · verified · 
   layout below 900 px.
 - **Next:** M6. Run the full loop, handle bridge coverage gaps, record the README video/GIF, do a
   security review, and add the Google logo.
+
+## 2026-09-30 · M6 Release (part 1): gameplay selftest and Google-tiles fixes
+
+- **Changes:** Added a scripted gameplay selftest (`src/testing/`): a robot playtester runs chained
+  scenarios with per-frame checks, in Vitest on the demo city (part of `npm run check`) and in the
+  browser via `?headless&selftest=loop|climbs|google|all` on any world. Dev-only `?demo` forces the free
+  demo city. `WorldSource.streaming`, `PlayerController.placeAt`, `CarController.fits/roadAhead`.
+- **Game bugs found by the selftest and fixed (each with a regression test that fails on the old code):**
+  parked taxi kept its speed after a reset; entering the taxi left player and camera one frame behind;
+  streaming-hole rescue waited for a 3 m drop (now 0.5 m, floor-above-feet test, ADR-007 revised);
+  single-ray ground probe fell through a 29 cm seam between Google tiles (now a 25 cm ring fallback);
+  called taxi parked where it could not drive off (now needs a wall-free footprint, prefers the heading
+  with the most open road); ledges 0.6–1.0 m were undetectable (wall probe only at 1 m; now also 0.5 m,
+  reach 1.1 m, three landing insets); narrow posts/bollards counted as ledges (now needs a flat top).
+- **Verified:** 106 tests pass. Demo city, browser selftest `all`: 6/6 pass incl. camera checks. Google
+  tiles: façade climb check passes with no falls and no bad climbs; full loop passes walk → wall stop →
+  climb → back down → call taxi → enter → drive (25.7 m/s, 44 m); the step timer was then too tight
+  (fixed, not re-run). Standing on the 29 cm seam and jumping lands back on the street.
+- **Not verified:** brake → exit → roof → glide → land → reset on Google; the ledge platform check's
+  effect on real climbs (last run 0/10 climbable, earlier 1–2/10); walk-throughs seen twice early on did
+  not reproduce once scripted moves waited for streaming, but are not ruled out in real play.
+- **Gotchas:** with a Google tab open, every source edit reloads it through Vite = a new billable
+  session; park the tab on `?demo` before editing. The plain dev URL loads Google tiles when `.env` has
+  a key. 19 Google sessions this session, about $0.11 ($6 per 1,000 root requests per Google's list).
+- **Next:** one Google `selftest=loop` run to finish the loop; then bridges, security review, collision
+  policy ADR, README/GIF, Google logo (owner supplies the file).

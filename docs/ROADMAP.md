@@ -48,7 +48,14 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M6 — Release
 
-- [ ] Full loop in one run: walk → climb → drive → exit → glide → land → reset
+- [~] Full loop in one run: walk → climb → drive → exit → glide → land → reset. Demo city: passes
+  (Vitest + browser selftest). Google tiles: walk → wall stop → climb → down → call → enter → drive
+  verified; brake → exit → glide → land → reset not yet run on Google
+- [x] Scripted gameplay selftest (`src/testing/`): full loop, reset mid-action, button mashing,
+  façade climb check; per-frame checks (fall-through, walk-through, stuck climb, car, camera)
+- [~] Climbing on real façades: knee-high ledges, reach 1.1 m, platform check (no bollards) unit-tested;
+  on Google 0–2 of 10 nearby walls climbable, no bad climbs; platform check not yet re-measured on Google
 - [ ] Bridges: missing spans stop the player safely with a visible notice
 - [ ] README gameplay video/GIF + screenshots; THIRD_PARTY_NOTICES complete
-- [ ] Security review (secrets, deps audit); all tests green
+- [ ] Security review (secrets, deps audit); all tests green (106 tests green; gitleaks full-history and
+  npm audit not run yet)
