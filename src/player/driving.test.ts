@@ -91,6 +91,24 @@ describe('Character driving', () => {
     expect(c.mode).toBe('driving');
   });
 
+  it('called while facing a nearby wall, the car parks with road ahead and can drive off', () => {
+    const c = spawned();
+    const hit = city.raycast(new Ray(new Vector3(0, 1, 24), new Vector3(1, 0, 0)), 50);
+    if (!hit) throw new Error('expected a wall east of the street');
+    c.foot.placeAt(hit.point.x - 4, 0, 24); // 4 m from the wall, looking straight at it
+    const east = -Math.PI / 2;
+    c.update(DT, { ...idle, vehicle: true }, east);
+    expect(c.carPlaced).toBe(true);
+    // Parked pointing down the street, not at the wall (or across the street at the far side).
+    expect(c.car.roadAhead(c.car.position.x, 0, c.car.position.z, c.car.yaw, 40)).toBe(40);
+    c.update(DT, { ...idle, vehicle: true }, east);
+    expect(c.mode).toBe('driving');
+    const start = c.car.position.clone();
+    run(c, { ...idle, forward: 1 }, 2);
+    expect(c.speed).toBeGreaterThan(5);
+    expect(c.car.position.distanceTo(start)).toBeGreaterThan(8);
+  });
+
   it('reset leaves the car and returns to spawn on foot', () => {
     const c = spawned();
     c.update(DT, { ...idle, vehicle: true }, 0);

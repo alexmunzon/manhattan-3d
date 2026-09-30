@@ -59,6 +59,15 @@ describe('findLedge', () => {
     expect(findLedge(tall, new Vector3(wallX - 0.5, 0, 24), EAST, false)).toBeNull();
   });
 
+  it('finds a knee-high ledge (below the 1 m probe) like a planter or low wall', async () => {
+    const knee = new DemoCitySource(new LocalFrame(SPAWN), { minHeight: 0.8, maxHeight: 0.9 });
+    await knee.load();
+    const face = knee.raycast(new Ray(new Vector3(0, 0.5, 24), EAST.clone()), 50);
+    if (!face) throw new Error('expected a low wall east of the street');
+    const ledge = findLedge(knee, new Vector3(face.point.x - 0.5, 0, 24), EAST, false);
+    expect(ledge?.top.y).toBeGreaterThan(0.7);
+  });
+
   it('rejects walls that are out of reach', () => {
     expect(findLedge(low, new Vector3(wallX - 3, 0, 24), EAST, false)).toBeNull();
   });

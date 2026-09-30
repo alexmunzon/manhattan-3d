@@ -44,6 +44,19 @@ export const CAR = {
  * following (pitch and roll from the terrain), bumper probes for walls. It cannot flip; a car
  * that falls out of the world is returned to its last safe spot.
  */
+/** Footprint sample directions as (forward, right) multiples of the half length/width. */
+const FOOTPRINT = [
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+const FIT_MARGIN = 0.2;
+
 export class CarController {
   readonly position = new Vector3();
   /** Heading in radians; 0 = north (-z). */
@@ -61,6 +74,9 @@ export class CarController {
   private readonly forward = new Vector3();
   private readonly right = new Vector3();
   private readonly corners = [0, 0, 0, 0];
+  private readonly scratchForward = new Vector3();
+  private readonly scratchRight = new Vector3();
+  private readonly scratchPoint = new Vector3();
 
   constructor(private readonly world: WorldSource) {}
 
@@ -78,6 +94,49 @@ export class CarController {
     this.roll = 0;
     this.onGround = true;
     return true;
+  }
+
+  /**
+   * True if a car standing at (x, y, z) facing `yaw` touches no walls: rays at bumper heights from
+   * its centre to each corner and side (plus a small margin) are clear.
+   */
+  fits(x: number, y: number, z: number, yaw: number): boolean {
+    const forward = this.scratchForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right = this.scratchRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+    for (const [f, r] of FOOTPRINT) {
+      const target = this.scratchPoint
+        .set(0, 0, 0)
+        .addScaledVector(forward, f * (CAR.halfLength + FIT_MARGIN))
+        .addScaledVector(right, r * (CAR.halfWidth + FIT_MARGIN));
+      const distance = target.length();
+      if (distance === 0) continue;
+      for (const height of CAR.bumperHeights) {
+        this.ray.origin.set(x, y + height, z);
+        this.ray.direction.copy(target).divideScalar(distance);
+        const hit = this.world.raycast(this.ray, distance);
+        if (hit && hit.normal.y < CAR.minFloorNormalY) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Clear road (m, up to `max`) ahead of both front corners of a car at (x, y, z) facing `yaw`. */
+  roadAhead(x: number, y: number, z: number, yaw: number, max: number): number {
+    const forward = this.scratchForward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right = this.scratchRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+    let clear = max;
+    for (const side of [-1, 1]) {
+      for (const height of CAR.bumperHeights) {
+        this.ray.origin
+          .set(x, y + height, z)
+          .addScaledVector(forward, CAR.halfLength)
+          .addScaledVector(right, CAR.halfWidth * side);
+        this.ray.direction.copy(forward);
+        const hit = this.world.raycast(this.ray, clear);
+        if (hit && hit.normal.y < CAR.minFloorNormalY) clear = hit.distance;
+      }
+    }
+    return clear;
   }
 
   update(dt: number, input: DriveInput): void {

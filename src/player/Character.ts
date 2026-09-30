@@ -38,6 +38,8 @@ const CAR_CALL_SPOTS = [
   [0, -1.5],
 ] as const;
 const CAR_CALL_MAX_STEP = 1;
+/** Open road ahead that makes a parking spot good enough to stop searching. */
+const CAR_CALL_ROAD = 40;
 const EXIT_SIDE_OFFSET = CAR.halfWidth + 0.8;
 
 /**
@@ -240,20 +242,29 @@ export class Character {
   }
 
   /**
-   * Parks the car next to the player, facing `yaw`: tries right, left, behind, then ahead, and
-   * uses the first spot at the player's own ground level (never a rooftop or inside a building).
+   * Parks the car next to the player: tries right, left, behind, then ahead, each facing `yaw`,
+   * the other way, and both sideways. A spot must be at the player's own ground level (never a
+   * rooftop) and fit the car without touching a wall. The first with a long open road ahead wins;
+   * otherwise the one with the most road, so the car points down the street when it can.
    */
   private callCar(yaw: number): void {
-    const sin = Math.sin(yaw);
-    const cos = Math.cos(yaw);
+    let best: { x: number; z: number; yaw: number; road: number } | null = null;
     for (const [right, back] of CAR_CALL_SPOTS) {
-      const x = this.position.x + (cos * right + sin * back) * CAR_CALL_OFFSET;
-      const z = this.position.z + (-sin * right + cos * back) * CAR_CALL_OFFSET;
+      const x = this.position.x + (Math.cos(yaw) * right + Math.sin(yaw) * back) * CAR_CALL_OFFSET;
+      const z = this.position.z + (-Math.sin(yaw) * right + Math.cos(yaw) * back) * CAR_CALL_OFFSET;
       const ground = this.world.heightAt(x, z);
       if (ground === null || Math.abs(ground - this.position.y) > CAR_CALL_MAX_STEP) continue;
-      this.carPlaced = this.car.place(x, z, yaw);
-      return;
+      for (const heading of [yaw, yaw + Math.PI, yaw + Math.PI / 2, yaw - Math.PI / 2]) {
+        if (!this.car.fits(x, ground, z, heading)) continue;
+        const road = this.car.roadAhead(x, ground, z, heading, CAR_CALL_ROAD);
+        if (road >= CAR_CALL_ROAD) {
+          this.carPlaced = this.car.place(x, z, heading);
+          return;
+        }
+        if (!best || road > best.road) best = { x, z, yaw: heading, road };
+      }
     }
+    if (best) this.carPlaced = this.car.place(best.x, best.z, best.yaw);
   }
 
   private updateDrive(dt: number, input: CharacterInput): void {
