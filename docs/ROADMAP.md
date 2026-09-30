@@ -20,7 +20,8 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 - [~] Dynamic attributions visible (verified); official Google logo asset still needed from Google brand resources
 - [x] Tile radius / LOD cap; distant tiles disposed; memory stable over repeated traversal (measured: 51–184 geometries over 3 laps, no growth)
 - [~] Clear errors: missing key verified in browser; rejected/quota/network messages unit-tested only
-- [ ] Policy check: runtime collision against loaded tiles allowed? (record ADR)
+- [~] Policy check: runtime collision against loaded tiles allowed? ADR-009 recorded (2026-09-30): believed
+  compliant, not confirmed by Google; ask support in writing before any hosted release
 
 ## M2 — On foot
 
@@ -56,6 +57,7 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 - [~] Climbing on real façades: knee-high ledges, reach 1.1 m, platform check (no bollards) unit-tested;
   on Google 0–2 of 10 nearby walls climbable, no bad climbs; platform check not yet re-measured on Google
 - [ ] Bridges: missing spans stop the player safely with a visible notice
-- [ ] README gameplay video/GIF + screenshots; THIRD_PARTY_NOTICES complete
-- [ ] Security review (secrets, deps audit); all tests green (106 tests green; gitleaks full-history and
-      npm audit not run yet)
+- [~] README gameplay video/GIF + screenshots: placeholders with recording steps written; owner records
+  the media. THIRD_PARTY_NOTICES complete (assets + runtime libraries; logo row pending the file)
+- [x] Security review: gitleaks over the full history clean, `.env` never tracked, `npm audit` 0
+      vulnerabilities, no key-shaped strings in tracked files (2026-09-30); 113 tests green
