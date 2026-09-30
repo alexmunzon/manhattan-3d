@@ -176,6 +176,8 @@ function walkToClimbableWall(plan: Plan): Step {
   let nextSearch = 0;
   const settle = settler();
   let settling = false;
+  /** When the player, pushing toward the stand spot, was first held still by the wall. */
+  let blockedSince = -1;
   /** Distant tiles sharpen after spawn, so a failed search is retried for a while. */
   const search = (ctx: ScenarioContext): void => {
     const c = ctx.character;
@@ -184,6 +186,8 @@ function walkToClimbableWall(plan: Plan): Step {
     if (plan.wall) return;
     const far = streetGrid(ctx.world, c.position, ctx.spawn.y, WIDE_SEARCH_RADIUS);
     plan.wall = findWalls(ctx.world, far, 15, 400).find((w) => w.climbable);
+    // A far spot we are already standing on would only teleport us in place, forever.
+    if (plan.wall && horizontal(c.position, plan.wall.origin) < 2) plan.wall = undefined;
     if (!plan.wall) return;
     // Scripted move to the far street spot. Its height came from blurry distant tiles, so hold
     // the player on the current floor while tiles there sharpen, then search again up close.
@@ -202,6 +206,7 @@ function walkToClimbableWall(plan: Plan): Step {
       moved = 0;
       nextSearch = 0;
       settling = false;
+      blockedSince = -1;
       plan.wall = undefined;
       return undefined;
     },
@@ -223,7 +228,24 @@ function walkToClimbableWall(plan: Plan): Step {
         }
         leg = 1;
       }
-      return walkToward(ctx.character, wall.stand, 0.1);
+      // Real façades have plinths and sills that stop the body a little short of the surveyed
+      // spot. Like a player, walk up until the wall holds you still, then call that arrived.
+      const c = ctx.character;
+      const held = horizontal(c.position, wall.stand) < 1 && c.foot.speed < STOPPED;
+      if (!held) blockedSince = -1;
+      else if (blockedSince < 0) blockedSince = ctx.t;
+      else if (ctx.t - blockedSince >= 0.3) return 'done';
+      return walkToward(c, wall.stand, 0.1);
+    },
+    timeoutDetail: (ctx) => {
+      const c = ctx.character;
+      const wall = plan.wall;
+      if (!wall) return `no wall chosen, moved ${moved.toFixed(0)} m, settling ${settling}`;
+      return (
+        `leg ${leg}, ${horizontal(c.position, wall.origin).toFixed(2)} m from the survey point, ` +
+        `${horizontal(c.position, wall.stand).toFixed(2)} m from the stand spot, ` +
+        `speed ${c.foot.speed.toFixed(2)} m/s`
+      );
     },
     check: (ctx) => {
       const wall = plan.wall;
