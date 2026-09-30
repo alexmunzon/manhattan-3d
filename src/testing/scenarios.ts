@@ -856,25 +856,46 @@ function onGoogle(ctx: ScenarioContext): boolean {
   return ctx.world.id === 'google';
 }
 
-/** Scripted: places the player on the deck and waits for the tiles there to settle. */
+/**
+ * Scripted: hovers above the deck while its tiles stream in, then steps onto the highest surface
+ * there. Snapping to the first surface below during streaming would land on the river, because
+ * the deck tile arrives a moment after the water tile beneath it.
+ */
 function goToDeck(deck: { river: number }): Step {
-  const settle = settler();
+  const HOVER = 60;
+  const hover = new Vector3();
   let skipped = false;
+  let quietSince = 0;
+  let landedAt = -1;
   return {
     name: 'go to the Brooklyn Bridge deck (scripted)',
-    timeout: SETTLE_MAX_SECONDS + 2,
+    timeout: SETTLE_MAX_SECONDS + 3,
     begin: (ctx) => {
       skipped = !onGoogle(ctx);
       if (skipped) return undefined;
       const c = ctx.character;
       if (c.mode !== 'onFoot') c.reset();
       const at = ctx.world.frame.toLocal(BROOKLYN_BRIDGE_DECK);
-      // Drop in from above the deck; the settler puts the feet on whatever loads there.
-      c.foot.placeAt(at.x, at.y + 60, at.z);
-      settle.start(0);
+      hover.set(at.x, at.y + HOVER, at.z);
+      quietSince = 0;
+      landedAt = -1;
       return undefined;
     },
-    tick: (ctx) => (skipped || !settle.busy(ctx) ? 'done' : IDLE),
+    tick: (ctx) => {
+      if (skipped) return 'done';
+      const c = ctx.character;
+      if (landedAt >= 0) return ctx.t - landedAt >= 0.5 ? 'done' : IDLE;
+      if (ctx.world.streaming) quietSince = ctx.t;
+      const quiet = ctx.t - quietSince >= SETTLE_QUIET_SECONDS;
+      if (!quiet && ctx.t < SETTLE_MAX_SECONDS) {
+        c.foot.placeAt(hover.x, hover.y, hover.z); // hold still in the air while tiles load
+        return IDLE;
+      }
+      const top = surfaceBelow(ctx.world, hover, hover.y);
+      c.foot.placeAt(hover.x, top ?? hover.y, hover.z);
+      landedAt = ctx.t;
+      return IDLE;
+    },
     check: (ctx) => {
       if (skipped) return undefined;
       const c = ctx.character;
@@ -882,13 +903,16 @@ function goToDeck(deck: { river: number }): Step {
       if (standing) return standing;
       // The river is the lowest surface under the deck; the deck must be well above it.
       const river = surfaceBelow(ctx.world, c.position, c.position.y - 2);
-      if (river === null) return 'nothing below the deck: not over the river';
+      if (river === null) return `nothing below the deck at y=${c.position.y.toFixed(1)}`;
       deck.river = river;
       const above = c.position.y - river;
       ctx.metrics.deckAboveRiver = Math.round(above);
       return above < DECK_MIN_Y_ABOVE_RIVER ? `only ${above.toFixed(0)} m above the river` : undefined;
     },
-    note: (ctx) => (skipped ? `skipped: needs Google tiles (world is ${ctx.world.id})` : undefined),
+    note: (ctx) =>
+      skipped
+        ? `skipped: needs Google tiles (world is ${ctx.world.id})`
+        : `deck ${ctx.metrics.deckAboveRiver} m above the river`,
   };
 }
 
