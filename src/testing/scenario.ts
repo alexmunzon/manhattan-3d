@@ -48,6 +48,8 @@ export interface Step {
   check?(ctx: ScenarioContext): string | undefined;
   /** Short note recorded on success (e.g. "no ledge here"). */
   note?(ctx: ScenarioContext): string | undefined;
+  /** Extra detail recorded if the step times out. */
+  timeoutDetail?(ctx: ScenarioContext): string;
 }
 
 export interface Scenario {
@@ -111,6 +113,14 @@ const AHEAD_PROBE = 1.5;
 const AHEAD_HISTORY = 10;
 /** Frames of state kept so each violation shows what led up to it. */
 const TRACE_FRAMES = 12;
+/** Centre of the feet plus a 25 cm ring, matching the controller's ground probe. */
+const FEET = [
+  [0, 0],
+  [0.25, 0],
+  [-0.25, 0],
+  [0, 0.25],
+  [0, -0.25],
+] as const;
 
 const MODES: readonly GameMode[] = ['onFoot', 'climbing', 'gliding', 'driving'];
 const PROBE_DISTANCE = 5_000;
@@ -152,9 +162,7 @@ class InvariantMonitor {
     const finite = [...c.position.toArray(), ...c.velocity.toArray()].every(Number.isFinite);
     this.rule('finite', !finite, time, 'position or velocity is not a number');
 
-    this.ray.origin.copy(c.position);
-    this.ray.origin.y += LIMITS.surfaceProbeLift;
-    const surface = this.world.raycast(this.ray, PROBE_DISTANCE);
+    const surface = this.surfaceBelow();
     this.noSurface = !surface && !c.foot.onGround && !driving ? this.noSurface + dt : 0;
     this.rule(
       'fell-through',
@@ -185,6 +193,20 @@ class InvariantMonitor {
 
     this.observeTunnel(time);
     if (camera) this.observeCamera(dt, time, camera);
+  }
+
+  /**
+   * Any surface below the player, under the centre of the feet or around them (like the game's own
+   * ground probe, so a crack narrower than the feet isn't mistaken for falling through the world).
+   */
+  private surfaceBelow(): boolean {
+    const p = this.character.position;
+    for (const [dx, dz] of FEET) {
+      this.ray.origin.set(p.x + dx, p.y + LIMITS.surfaceProbeLift, p.z + dz);
+      this.ray.direction.set(0, -1, 0);
+      if (this.world.raycast(this.ray, PROBE_DISTANCE)) return true;
+    }
+    return false;
   }
 
   private recordTrace(time: number): void {
@@ -331,7 +353,8 @@ export class ScenarioRun {
       if (!step) continue;
       this.ctx.t = this.stepTime;
       if (this.stepTime > step.timeout) {
-        this.finish('fail', `timed out after ${step.timeout} s`);
+        const extra = step.timeoutDetail ? `: ${step.timeoutDetail(this.ctx)}` : '';
+        this.finish('fail', `timed out after ${step.timeout} s${extra}`);
         continue;
       }
       const command = step.tick(this.ctx);

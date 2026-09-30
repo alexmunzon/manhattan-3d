@@ -400,13 +400,26 @@ function drive(plan: Plan, seconds: number): Step {
     check: (ctx) => {
       const c = ctx.character;
       const travelled = horizontal(c.car.position, plan.start);
-      if (c.speed < 10) return `only ${c.speed.toFixed(1)} m/s after ${seconds} s`;
-      if (travelled < 20) return `only travelled ${travelled.toFixed(1)} m`;
+      const why = describeDrive(ctx, travelled, reverseUntil > 0);
+      if (c.speed < 10) return `only ${c.speed.toFixed(1)} m/s after ${seconds} s (${why})`;
+      if (travelled < 20) return `only travelled ${travelled.toFixed(1)} m (${why})`;
       if (!c.car.onGround) return 'wheels are off the ground';
       return undefined;
     },
     note: () => (reverseUntil > 0 ? 'backed out first: taxi was parked nose-in' : undefined),
+    timeoutDetail: (ctx) =>
+      describeDrive(ctx, horizontal(ctx.character.car.position, plan.start), reverseUntil > 0),
   };
+}
+
+/** What the taxi was doing, for a failed drive: speed, distance, road ahead, and whether it reversed. */
+function describeDrive(ctx: ScenarioContext, travelled: number, reversed: boolean): string {
+  const car = ctx.character.car;
+  const road = car.roadAhead(car.position.x, car.position.y, car.position.z, car.yaw, 40);
+  return (
+    `speed ${car.speed.toFixed(1)} m/s, moved ${travelled.toFixed(1)} m, ` +
+    `road ahead ${road.toFixed(1)} m${reversed ? ', had to back out' : ''}`
+  );
 }
 
 function brake(): Step {
