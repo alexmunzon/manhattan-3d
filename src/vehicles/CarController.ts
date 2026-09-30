@@ -70,6 +70,8 @@ export class CarController {
   onGround = true;
 
   private readonly lastSafe = new Vector3();
+  /** Times the car fell out of the world (no floor for `fallLimit`) and was put back. */
+  rescues = 0;
   private readonly ray = new Ray();
   private readonly forward = new Vector3();
   private readonly right = new Vector3();
@@ -158,6 +160,7 @@ export class CarController {
       this.position.copy(this.lastSafe);
       this.speed = 0;
       this.verticalSpeed = 0;
+      this.rescues++;
     }
   }
 

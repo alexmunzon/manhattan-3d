@@ -42,6 +42,7 @@ const CAR_CALL_MAX_STEP = 1;
 const CAR_CALL_ROAD = 40;
 const EXIT_SIDE_OFFSET = CAR.halfWidth + 0.8;
 export const NO_ROOM_FOR_TAXI = 'No room for the taxi here. Call it from an open street.';
+export const FELL_OUT_OF_WORLD = 'Nothing to stand on there. Back on solid ground.';
 
 /**
  * Owns the player's mode (on foot, climbing, gliding) and routes each frame to the one active
@@ -56,6 +57,7 @@ export class Character {
   carPlaced = false;
   /** One-shot message for the HUD (for example, the taxi found no room). Cleared by `takeNotice`. */
   private pendingNotice: string | null = null;
+  private noticedRescues = 0;
   /** Facing yaw for the avatar (0 = north). */
   facing = 0;
 
@@ -140,6 +142,7 @@ export class Character {
   }
 
   update(dt: number, input: CharacterInput, cameraYaw: number): void {
+    this.noticeRescues();
     this.time += dt;
     switch (this.mode) {
       case 'onFoot':
@@ -269,6 +272,13 @@ export class Character {
     }
     if (best) this.carPlaced = this.car.place(best.x, best.z, best.yaw);
     else this.pendingNotice = NO_ROOM_FOR_TAXI;
+  }
+
+  /** A fall out of the world (missing geometry, e.g. a bridge gap) ends with a notice. */
+  private noticeRescues(): void {
+    const rescues = this.foot.rescues + this.car.rescues;
+    if (rescues > this.noticedRescues) this.pendingNotice = FELL_OUT_OF_WORLD;
+    this.noticedRescues = rescues;
   }
 
   /** Returns and clears the pending HUD message, if any. */

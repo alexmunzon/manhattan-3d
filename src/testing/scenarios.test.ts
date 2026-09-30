@@ -5,7 +5,7 @@ import { Character } from '../player/Character';
 import { DemoCitySource } from '../world/DemoCitySource';
 import { LocalFrame } from '../world/geo';
 import { ScenarioRun, type Scenario, type ScenarioResult } from './scenario';
-import { buttonMash, fullLoop, resetMidAction } from './scenarios';
+import { bridgeWalk, buttonMash, fullLoop, resetMidAction } from './scenarios';
 
 const DT = 1 / 60;
 const MAX_SECONDS = 300;
@@ -79,5 +79,14 @@ describe('gameplay scenarios on the demo city', () => {
       run.observe(DT, frame.input);
     }
     expect(run.result.violations.map((v) => v.rule)).toContain('walked-through');
+  });
+});
+
+describe('bridge walk (B1)', () => {
+  it('is skipped, not failed, on a world without the bridge', async () => {
+    const result = await play(bridgeWalk());
+    expect(result.passed).toBe(true);
+    expect(result.steps.every((s) => s.status === 'pass')).toBe(true);
+    expect(result.steps[0]?.detail).toContain('needs Google tiles');
   });
 });

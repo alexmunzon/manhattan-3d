@@ -16,6 +16,7 @@ import {
   type WallSpot,
 } from './probes';
 import type { Command, Scenario, ScenarioContext, Step } from './scenario';
+import type { GeoPoint } from '../world/geo';
 
 /**
  * The gameplay test cases. Each factory returns a fresh scenario (steps keep state in closures).
@@ -822,4 +823,145 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
           ? 'climbed'
           : 'no ledge here',
   };
+}
+
+// ---------- bridges ----------
+
+/** On the Brooklyn Bridge deck between the towers (measured on Google tiles, 2026-09-30). */
+const BROOKLYN_BRIDGE_DECK: GeoPoint = { lat: 40.706715, lon: -73.997805, alt: 0 };
+/** Deck heading toward Brooklyn, as a camera yaw (0 = north). Manhattan is the opposite way. */
+const BROOKLYN_BRIDGE_YAW = -(3 * Math.PI) / 4;
+const DECK_WALK_SECONDS = 45;
+/** Below this the player has left the deck: the river and the approach streets are lower. */
+const DECK_MIN_Y_ABOVE_RIVER = 20;
+
+/**
+ * B1: stands on the Brooklyn Bridge deck and walks it both ways, steering along the deck like a
+ * player watching the road. Needs Google tiles (the demo city has no bridge): elsewhere it is
+ * skipped and says so. Falls into the river or out of the world fail the step.
+ */
+export function bridgeWalk(): Scenario {
+  const deck = { river: Number.NaN };
+  return {
+    name: 'Brooklyn Bridge: walk the deck both ways',
+    steps: [
+      goToDeck(deck),
+      walkDeck('walk the deck toward Brooklyn', BROOKLYN_BRIDGE_YAW, deck),
+      walkDeck('walk the deck back toward Manhattan', BROOKLYN_BRIDGE_YAW + Math.PI, deck),
+    ],
+  };
+}
+
+function onGoogle(ctx: ScenarioContext): boolean {
+  return ctx.world.id === 'google';
+}
+
+/** Scripted: places the player on the deck and waits for the tiles there to settle. */
+function goToDeck(deck: { river: number }): Step {
+  const settle = settler();
+  let skipped = false;
+  return {
+    name: 'go to the Brooklyn Bridge deck (scripted)',
+    timeout: SETTLE_MAX_SECONDS + 2,
+    begin: (ctx) => {
+      skipped = !onGoogle(ctx);
+      if (skipped) return undefined;
+      const c = ctx.character;
+      if (c.mode !== 'onFoot') c.reset();
+      const at = ctx.world.frame.toLocal(BROOKLYN_BRIDGE_DECK);
+      // Drop in from above the deck; the settler puts the feet on whatever loads there.
+      c.foot.placeAt(at.x, at.y + 60, at.z);
+      settle.start(0);
+      return undefined;
+    },
+    tick: (ctx) => (skipped || !settle.busy(ctx) ? 'done' : IDLE),
+    check: (ctx) => {
+      if (skipped) return undefined;
+      const c = ctx.character;
+      const standing = standingCheck(ctx);
+      if (standing) return standing;
+      // The river is the lowest surface under the deck; the deck must be well above it.
+      const river = surfaceBelow(ctx.world, c.position, c.position.y - 2);
+      if (river === null) return 'nothing below the deck: not over the river';
+      deck.river = river;
+      const above = c.position.y - river;
+      ctx.metrics.deckAboveRiver = Math.round(above);
+      return above < DECK_MIN_Y_ABOVE_RIVER ? `only ${above.toFixed(0)} m above the river` : undefined;
+    },
+    note: (ctx) => (skipped ? `skipped: needs Google tiles (world is ${ctx.world.id})` : undefined),
+  };
+}
+
+/**
+ * Sprints along the deck for {@link DECK_WALK_SECONDS}, re-aiming every half second at the heading
+ * (within ±30° of the base) whose ground stays at deck level for longest, like a player keeping to
+ * the road. Fails on a fall into the river or a rescue from out of the world.
+ */
+function walkDeck(name: string, baseYaw: number, deck: { river: number }): Step {
+  let start = new Vector3();
+  let yaw = baseYaw;
+  let nextAim = 0;
+  let rescues = 0;
+  let minY = Infinity;
+  let skipped = false;
+  return {
+    name,
+    timeout: DECK_WALK_SECONDS + 2,
+    begin: (ctx) => {
+      skipped = !onGoogle(ctx);
+      start = ctx.character.position.clone();
+      yaw = baseYaw;
+      nextAim = 0;
+      rescues = ctx.character.foot.rescues;
+      minY = Infinity;
+      return undefined;
+    },
+    tick: (ctx) => {
+      if (skipped || ctx.t >= DECK_WALK_SECONDS) return 'done';
+      const c = ctx.character;
+      minY = Math.min(minY, c.position.y);
+      if (ctx.t >= nextAim) {
+        nextAim = ctx.t + 0.5;
+        yaw = deckHeading(ctx, baseYaw, yaw);
+      }
+      return { input: { forward: 1, sprint: true }, yaw };
+    },
+    check: (ctx) => {
+      if (skipped) return undefined;
+      const c = ctx.character;
+      const walked = horizontal(c.position, start);
+      ctx.metrics[`${name}: walked m`] = Math.round(walked);
+      if (c.foot.rescues > rescues) return `fell out of the world ${c.foot.rescues - rescues}x`;
+      if (minY - deck.river < DECK_MIN_Y_ABOVE_RIVER) {
+        return `fell off the deck to ${(minY - deck.river).toFixed(0)} m above the river`;
+      }
+      if (walked < 100) return `only walked ${walked.toFixed(0)} m in ${DECK_WALK_SECONDS} s`;
+      return standingCheck(ctx);
+    },
+    note: (ctx) =>
+      skipped ? 'skipped: needs Google tiles' : `walked ${horizontal(ctx.character.position, start).toFixed(0)} m`,
+  };
+}
+
+/** Heading near `base` whose ground ahead stays within 3 m of the feet for longest (up to 60 m). */
+function deckHeading(ctx: ScenarioContext, base: number, current: number): number {
+  const { x, y, z } = ctx.character.position;
+  let best = current;
+  let bestRun = -1;
+  for (let i = -6; i <= 6; i++) {
+    const yaw = base + (i / 6) * (Math.PI / 6);
+    const dir = forwardOf(yaw);
+    let run = 0;
+    for (let d = 4; d <= 60; d += 4) {
+      const h = ctx.world.heightAt(x + dir.x * d, z + dir.z * d);
+      if (h === null || Math.abs(h - y) > 3) break;
+      run = d;
+    }
+    const score = run - Math.abs(yaw - current) * 4; // prefer not to zigzag
+    if (score > bestRun) {
+      bestRun = score;
+      best = yaw;
+    }
+  }
+  return best;
 }

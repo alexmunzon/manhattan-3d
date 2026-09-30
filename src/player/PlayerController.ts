@@ -60,6 +60,8 @@ export class PlayerController {
   spawned = false;
 
   private readonly lastSafe = new Vector3();
+  /** Times the player fell out of the world (no floor for `fallLimit`) and was put back. */
+  rescues = 0;
   private readonly spawnPoint = new Vector3();
   private settleTimer = 0;
   private readonly ray = new Ray();
@@ -128,6 +130,7 @@ export class PlayerController {
     if (this.position.y < this.lastSafe.y - PLAYER.fallLimit) {
       this.position.copy(this.lastSafe);
       this.velocity.set(0, 0, 0);
+      this.rescues++;
     }
   }
 

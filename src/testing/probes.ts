@@ -87,6 +87,7 @@ export function findWalls(
         if (h && Math.abs(h.normal.y) < WALL_NORMAL_MAX_Y) hit = h;
       }
       if (!hit || hit.distance < STAND_OFF * 2) continue;
+      const distance = hit.distance; // the hit object is reused by the casts below
       // Face the wall square-on (along its normal), as a player lining up a climb would.
       const facing = new Vector3(-hit.normal.x, 0, -hit.normal.z).normalize();
       const stand = hit.point.clone().addScaledVector(facing, -STAND_OFF);
@@ -95,7 +96,7 @@ export function findWalls(
       stand.y = floor;
       if (found.some((s) => s.stand.distanceTo(stand) < spacing)) continue;
       const climbable = findLedge(world, stand, facing, false) !== null;
-      found.push({ origin, stand, yaw: yawToward(facing), climbable, distance: hit.distance });
+      found.push({ origin, stand, yaw: yawToward(facing), climbable, distance });
     }
   }
   return found

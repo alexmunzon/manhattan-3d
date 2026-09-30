@@ -35,7 +35,10 @@ export interface WorldSource {
   load(): Promise<void>;
   /** Per-frame streaming update (tile selection, LOD, unloading). Must not allocate. */
   update(camera: Camera): void;
-  /** Nearest hit along `ray` within `maxDistance` metres, or `null`. */
+  /**
+   * Nearest hit along `ray` within `maxDistance` metres, or `null`. The returned object is reused
+   * by the next call, so copy anything you need before casting again.
+   */
   raycast(ray: Ray, maxDistance: number): WorldHit | null;
   /** Height of the topmost surface at game-space (x, z), or `null` if nothing is loaded there. */
   heightAt(x: number, z: number): number | null;

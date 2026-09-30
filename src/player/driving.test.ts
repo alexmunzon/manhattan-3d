@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { SPAWN } from '../config/world';
 import { DemoCitySource } from '../world/DemoCitySource';
 import { LocalFrame } from '../world/geo';
-import { Character, type CharacterInput, NO_ROOM_FOR_TAXI } from './Character';
+import { Character, type CharacterInput, FELL_OUT_OF_WORLD, NO_ROOM_FOR_TAXI } from './Character';
 
 const DT = 1 / 60;
 const idle: CharacterInput = {
@@ -43,6 +43,28 @@ describe('Character spawning', () => {
     const c = spawned();
     expect(c.carPlaced).toBe(true);
     expect(c.position.distanceTo(c.car.position)).toBeLessThan(5);
+  });
+});
+
+describe('Character falling out of the world', () => {
+  it('puts the player back on solid ground and says so', () => {
+    const c = spawned();
+    // A world with nothing in it: the ground vanished (missing bridge span, unloaded tile).
+    const nothing = { id: 'void', raycast: () => null, heightAt: () => null } as unknown as DemoCitySource;
+    const lost = new Character(nothing);
+    lost.foot.spawnAt(0, 0, 24);
+    expect(lost.takeNotice()).toBeNull();
+    let notice: string | null = null;
+    // 150 m of free fall takes about 4 s; the notice follows the rescue on the next frame.
+    for (let t = 0; notice === null && t < 6; t += DT) {
+      lost.update(DT, idle, 0);
+      notice = lost.takeNotice();
+    }
+    expect(notice).toBe(FELL_OUT_OF_WORLD);
+    expect(lost.foot.rescues).toBe(1);
+    expect(lost.position.y).toBeGreaterThan(-0.1); // back at the spawn height, one frame on
+    expect(lost.takeNotice()).toBeNull();
+    expect(c.foot.rescues).toBe(0); // a player on real ground never sees it
   });
 });
 
