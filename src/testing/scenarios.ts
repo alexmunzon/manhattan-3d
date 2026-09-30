@@ -29,6 +29,8 @@ const SURVEY_RADIUS = 40;
 /** A climb must rise at least this much and no more than a mid-air ledge allows. */
 const CLIMB_RISE = { min: 0.5, max: 3.0 } as const;
 const STOPPED = 0.5;
+/** Longest a driven car may stay off the ground before that counts as stuck or falling. */
+const MAX_AIRBORNE_SECONDS = 1;
 const LIFT_HEIGHT = 40;
 const WIDE_SEARCH_RADIUS = 150;
 const SEARCH_SECONDS = 20;
@@ -370,6 +372,10 @@ function drive(plan: Plan, seconds: number): Step {
   let nextAim = 0;
   let reverseUntil = -1;
   let driveFrom = 0;
+  // Real streets have curbs and crowns, so a fast car leaves the ground for a frame or two
+  // like any arcade car. Only a long stretch in the air means it is stuck or falling.
+  let airborneSince = -1;
+  let longestAirborne = 0;
   return {
     name: `drive for ${seconds} s (W, steering)`,
     // Room for a bump-and-back-out partway through, on top of the full drive.
@@ -379,10 +385,18 @@ function drive(plan: Plan, seconds: number): Step {
       nextAim = 0;
       reverseUntil = -1;
       driveFrom = 0;
+      airborneSince = -1;
+      longestAirborne = 0;
       return undefined;
     },
     tick: (ctx) => {
       const car = ctx.character.car;
+      if (car.onGround) {
+        airborneSince = -1;
+      } else {
+        if (airborneSince < 0) airborneSince = ctx.t;
+        longestAirborne = Math.max(longestAirborne, ctx.t - airborneSince);
+      }
       if (ctx.t >= nextAim) {
         nextAim = ctx.t + 0.5;
         target = openRoadHeading(car);
@@ -404,10 +418,17 @@ function drive(plan: Plan, seconds: number): Step {
       const why = describeDrive(ctx, travelled, reverseUntil > 0);
       if (c.speed < 10) return `only ${c.speed.toFixed(1)} m/s after ${seconds} s (${why})`;
       if (travelled < 20) return `only travelled ${travelled.toFixed(1)} m (${why})`;
-      if (!c.car.onGround) return 'wheels are off the ground';
+      if (longestAirborne > MAX_AIRBORNE_SECONDS) {
+        return `wheels were off the ground for ${longestAirborne.toFixed(2)} s`;
+      }
       return undefined;
     },
-    note: () => (reverseUntil > 0 ? 'backed out first: taxi was parked nose-in' : undefined),
+    note: () => {
+      const notes = [];
+      if (reverseUntil > 0) notes.push('backed out first: taxi was parked nose-in');
+      if (longestAirborne > 0) notes.push(`longest hop ${longestAirborne.toFixed(2)} s`);
+      return notes.length > 0 ? notes.join('; ') : undefined;
+    },
     timeoutDetail: (ctx) =>
       describeDrive(ctx, horizontal(ctx.character.car.position, plan.start), reverseUntil > 0),
   };
