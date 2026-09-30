@@ -86,6 +86,14 @@ export class PlayerController {
     this.spawned = true;
   }
 
+  /** Stands the player at (x, y, z) without moving the spawn point (e.g. scripted tests). */
+  placeAt(x: number, y: number, z: number): void {
+    this.position.set(x, y, z);
+    this.lastSafe.copy(this.position);
+    this.velocity.set(0, 0, 0);
+    this.onGround = true;
+  }
+
   /** Returns to the spawn point, standing still. */
   respawn(): void {
     const ground = this.world.heightAt(this.spawnPoint.x, this.spawnPoint.z);

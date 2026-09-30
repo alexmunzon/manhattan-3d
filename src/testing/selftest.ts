@@ -6,7 +6,7 @@ import { ScenarioRun, type Scenario, type ScenarioResult } from './scenario';
 import { buttonMash, facadeClimbs, fullLoop, resetMidAction } from './scenarios';
 
 /**
- * Dev-only in-browser runner: `?headless&selftest=loop|climbs|all`. Plays the scenarios through
+ * Dev-only in-browser runner: `?headless&selftest=loop|climbs|google|all`. Plays the scenarios through
  * the real game loop (camera included) on whatever world is loaded: Google tiles when a key is
  * set, or the demo city with `?demo`. Results appear in a HUD panel and on
  * `window.__manhattan.selftest` (step names, positions and counts only).
@@ -15,6 +15,8 @@ import { buttonMash, facadeClimbs, fullLoop, resetMidAction } from './scenarios'
 const SUITES: Record<string, () => Scenario[]> = {
   loop: () => [fullLoop()],
   climbs: () => [facadeClimbs()],
+  /** G1 + G2 in one page load, so one Google tiles session. */
+  google: () => [fullLoop(), facadeClimbs()],
   all: () => [fullLoop(), ...resetMidAction(), buttonMash(), facadeClimbs()],
 };
 

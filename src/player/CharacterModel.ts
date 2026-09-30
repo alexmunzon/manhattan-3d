@@ -100,9 +100,7 @@ export class CharacterModel implements AvatarView {
     this.root.traverse((node) => {
       if (!(node instanceof Mesh)) return;
       const mesh = node as Mesh;
-      const materials = (
-        Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      );
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const m of materials) if ('color' in m && m.color instanceof Color) m.color.set(color);
     });
   }

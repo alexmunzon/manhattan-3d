@@ -29,6 +29,10 @@ const SURVEY_RADIUS = 40;
 const CLIMB_RISE = { min: 0.5, max: 3.0 } as const;
 const STOPPED = 0.5;
 const LIFT_HEIGHT = 40;
+const WIDE_SEARCH_RADIUS = 150;
+const SEARCH_SECONDS = 20;
+/** Lower Manhattan streets slope; street spots may sit this far above or below spawn. */
+const STREET_GRADE = 3;
 
 // ---------- building blocks ----------
 
@@ -130,21 +134,45 @@ interface Plan {
   roof?: Roof | null;
 }
 
-/** Finds a climbable wall near spawn and walks to it: down the street, then across to the wall. */
+/**
+ * Finds a climbable wall and walks to it: down the street, then across to the wall. If none is in
+ * walking reach, searches street spots up to 150 m away and moves there first (scripted), since
+ * real low ledges are rare on photogrammetry.
+ */
 function walkToClimbableWall(plan: Plan): Step {
   let leg = 0;
+  let moved = 0;
+  let nextSearch = 0;
+  /** Distant tiles sharpen after spawn, so a failed search is retried for a while. */
+  const search = (ctx: ScenarioContext): void => {
+    const c = ctx.character;
+    const near = surveyOrigins(ctx.world, c.position);
+    plan.wall = findWalls(ctx.world, near, SURVEY_RADIUS, 200).find((w) => w.climbable);
+    if (plan.wall) return;
+    const far = streetGrid(ctx.world, c.position, ctx.spawn.y, WIDE_SEARCH_RADIUS);
+    plan.wall = findWalls(ctx.world, far, 15, 400).find((w) => w.climbable);
+    if (!plan.wall) return;
+    moved = horizontal(c.position, plan.wall.origin);
+    const o = plan.wall.origin;
+    c.foot.placeAt(o.x, o.y, o.z);
+  };
   return {
     name: 'walk to a climbable wall',
     timeout: 60,
-    begin: (ctx) => {
+    begin: () => {
       leg = 0;
-      const origins = surveyOrigins(ctx.world, ctx.character.position);
-      plan.wall = findWalls(ctx.world, origins, SURVEY_RADIUS, 200).find((w) => w.climbable);
-      return plan.wall ? undefined : `no climbable ledge found near spawn`;
+      moved = 0;
+      nextSearch = 0;
+      plan.wall = undefined;
+      return undefined;
     },
     tick: (ctx) => {
+      if (!plan.wall && ctx.t >= nextSearch) {
+        nextSearch = ctx.t + 2;
+        search(ctx);
+      }
       const wall = plan.wall;
-      if (!wall) return 'done';
+      if (!wall) return ctx.t > SEARCH_SECONDS ? 'done' : IDLE;
       if (leg === 0) {
         if (walkToward(ctx.character, wall.origin) !== 'done') {
           return walkToward(ctx.character, wall.origin);
@@ -153,8 +181,33 @@ function walkToClimbableWall(plan: Plan): Step {
       }
       return walkToward(ctx.character, wall.stand, 0.15);
     },
-    check: (ctx) => standingCheck(ctx),
+    check: (ctx) =>
+      plan.wall
+        ? standingCheck(ctx)
+        : `no climbable ledge found within ${WIDE_SEARCH_RADIUS} m after ${SEARCH_SECONDS} s`,
+    note: () => (moved > 0 ? `scripted: moved ${moved.toFixed(0)} m to reach a ledge` : undefined),
   };
+}
+
+/** Street-level spots (top surface within {@link STREET_GRADE} of `street`) on a grid around `center`. */
+function streetGrid(
+  world: ScenarioContext['world'],
+  center: Vector3,
+  street: number,
+  radius: number,
+  step = 10,
+): Vector3[] {
+  const spots: Vector3[] = [];
+  for (let dx = -radius; dx <= radius; dx += step) {
+    for (let dz = -radius; dz <= radius; dz += step) {
+      if (Math.hypot(dx, dz) > radius) continue;
+      const x = center.x + dx;
+      const z = center.z + dz;
+      const y = world.heightAt(x, z);
+      if (y !== null && Math.abs(y - street) < STREET_GRADE) spots.push(new Vector3(x, y, z));
+    }
+  }
+  return spots;
 }
 
 /** Keeps walking into the wall: the player must stop in front of it, not pass through. */
@@ -301,9 +354,7 @@ function goToRoof(plan: Plan): Step {
       const roof = plan.roof;
       if (!roof) return 'no flat roof 25 m+ tall within 200 m';
       const c = ctx.character;
-      c.position.copy(roof.top);
-      c.velocity.set(0, 0, 0);
-      c.foot.onGround = true;
+      c.foot.placeAt(roof.top.x, roof.top.y, roof.top.z);
       return undefined;
     },
     tick: (ctx) => (ctx.t >= 0.5 ? 'done' : IDLE),
@@ -535,9 +586,15 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
       // Scripted: stand 2 m back from the wall on the street, then walk up to it.
       const c = ctx.character;
       if (c.mode !== 'onFoot') c.reset();
-      c.position.copy(wall.stand).addScaledVector(forwardOf(wall.yaw), -2);
-      c.velocity.set(0, 0, 0);
-      c.foot.onGround = true;
+      // Tiles refine as the player moves, so re-read both floors from the current geometry.
+      const approach = wall.stand.clone().addScaledVector(forwardOf(wall.yaw), -2);
+      const standFloor = surfaceBelow(ctx.world, wall.stand, wall.stand.y + 2);
+      const floor = surfaceBelow(ctx.world, approach, wall.stand.y + 2);
+      if (floor === null || standFloor === null || Math.abs(floor - standFloor) > 0.5) {
+        phase = 'skip';
+        return undefined;
+      }
+      c.foot.placeAt(approach.x, floor, approach.z);
       return undefined;
     },
     tick: (ctx) => {
@@ -562,7 +619,7 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
     },
     check: (ctx) => {
       const wall = spot();
-      if (!wall) return undefined;
+      if (!wall || phase === 'skip') return undefined;
       const m = ctx.metrics;
       if (!climbed) {
         m.noLedge = (m.noLedge ?? 0) + 1;
@@ -577,6 +634,11 @@ function climbTrial(i: number, spot: () => WallSpot | undefined): Step {
       if (bad) m.badClimbs = (m.badClimbs ?? 0) + 1;
       return bad;
     },
-    note: () => (phase === 'skip' ? 'no wall surveyed' : climbed ? 'climbed' : 'no ledge here'),
+    note: () =>
+      phase === 'skip'
+        ? 'skipped: no wall or no floor to approach from'
+        : climbed
+          ? 'climbed'
+          : 'no ledge here',
   };
 }
