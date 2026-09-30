@@ -361,7 +361,7 @@ function enterTaxi(): Step {
 }
 
 /**
- * Full throttle, steering toward the clearest street like a player would. If the taxi is parked
+ * Full throttle, steering toward open road like a player would. If the taxi is parked
  * nose-in to something, it first backs out for a second while steering.
  */
 function drive(plan: Plan, seconds: number): Step {
@@ -384,7 +384,7 @@ function drive(plan: Plan, seconds: number): Step {
       const car = ctx.character.car;
       if (ctx.t >= nextAim) {
         nextAim = ctx.t + 0.5;
-        target = clearestHeading(ctx.world, car.position).yaw;
+        target = openRoadHeading(car);
       }
       const diff = Math.atan2(Math.sin(target - car.yaw), Math.cos(target - car.yaw));
       // Positive steer turns clockwise (yaw decreases), so steer against the heading error.
@@ -410,6 +410,25 @@ function drive(plan: Plan, seconds: number): Step {
     timeoutDetail: (ctx) =>
       describeDrive(ctx, horizontal(ctx.character.car.position, plan.start), reverseUntil > 0),
   };
+}
+
+/**
+ * Heading with the most open road as the taxi's own bumpers see it (low obstacles included),
+ * preferring small turns from where it points now. What a player looking out the windscreen does.
+ */
+function openRoadHeading(car: Character['car']): number {
+  const { x, y, z } = car.position;
+  let best = car.yaw;
+  let bestScore = -Infinity;
+  for (let i = -8; i <= 8; i++) {
+    const yaw = car.yaw + (i / 8) * (Math.PI / 2);
+    const score = car.roadAhead(x, y, z, yaw, 40) - Math.abs(i) * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = yaw;
+    }
+  }
+  return best;
 }
 
 /** What the taxi was doing, for a failed drive: speed, distance, road ahead, and whether it reversed. */
