@@ -63,11 +63,15 @@ Photogrammetry parked cars and trees act as solid obstacles.
 
 **Context:** In the browser, the player fell through Google tiles right after spawning. While tiles
 swap detail levels, the surface underfoot can briefly disappear.
-**Decision:** If the player or car has dropped more than 3 m below its last safe spot and the topmost
-surface at its x/z is back within 3 m of that height, snap it onto that surface. Spawning also picks
-the nearest street-level point, never a rooftop.
-**Consequences:** Streaming gaps no longer cause long falls. A real fall off a roof is unaffected,
-because the surface below a roof edge is the street, far lower.
+**Decision:** If the player or car has dropped more than 0.5 m below its last safe spot, look straight
+down from just above that height. A walkable floor found above the feet is one it fell through: snap
+back onto it. Spawning also picks the nearest street-level point, never a rooftop.
+**Consequences:** Streaming gaps no longer cause long falls, and players no longer visibly sink. A
+real fall off a roof or ledge is unaffected, because there is only air above the feet there.
+**Revised 2026-09-30:** the first version waited for a 3 m drop and used the topmost surface. On
+Google tiles the gameplay selftest caught players sinking up to 3 m through the street during tile
+swaps (and "climbing" back out), so the threshold is now 0.5 m, and the floor-above-feet test
+replaces the topmost-surface test so awnings or trees above a low drop can't catch the player.
 
 ## ADR-008 — Minimap and teleport without extra paid APIs (2026-09-29)
 

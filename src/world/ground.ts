@@ -1,8 +1,11 @@
+import type { Ray, Vector3 } from 'three';
 import type { WorldSource } from './WorldSource';
 
 const SAMPLE_STEP = 4;
 /** Surfaces within this height of the lowest one count as the same street level. */
 const LEVEL_TOLERANCE = 0.5;
+/** Hole recovery looks down from this far above the last safe floor (bumps and slopes). */
+const FLOOR_RECOVERY_LIFT = 0.5;
 
 /**
  * Finds street level near (x, z): the lowest surface within `radius`, preferring the sample
@@ -31,4 +34,26 @@ export function findStreetLevel(
     if (s.y <= lowest + LEVEL_TOLERANCE && (best === null || s.d2 < best.d2)) best = s;
   }
   return best && { x: best.x, y: best.y, z: best.z };
+}
+
+/**
+ * Streaming-hole check shared by the player and the car (ADR-007): once `position` has dropped
+ * `floorRecoveryDrop` below `lastSafe`, looks straight down from just above the last safe height.
+ * A walkable floor between there and the feet is one they fell through; returns its height.
+ */
+export function floorAboveFeet(
+  world: WorldSource,
+  ray: Ray,
+  position: Vector3,
+  lastSafe: Vector3,
+  limits: { floorRecoveryDrop: number; floorRecoveryBand: number; minFloorNormalY: number },
+): number | null {
+  if (position.y > lastSafe.y - limits.floorRecoveryDrop) return null;
+  const from = lastSafe.y + FLOOR_RECOVERY_LIFT;
+  ray.origin.set(position.x, from, position.z);
+  ray.direction.set(0, -1, 0);
+  const hit = world.raycast(ray, from - position.y);
+  if (!hit || hit.normal.y < limits.minFloorNormalY) return null;
+  if (hit.point.y < lastSafe.y - limits.floorRecoveryBand) return null;
+  return hit.point.y;
 }

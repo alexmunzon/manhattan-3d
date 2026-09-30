@@ -1,4 +1,5 @@
 import { Ray, Vector3 } from 'three';
+import { floorAboveFeet } from '../world/ground';
 import type { WorldSource } from '../world/WorldSource';
 
 /** Driver input, -1..1 per axis. */
@@ -34,7 +35,7 @@ export const CAR = {
   minFloorNormalY: 0.6,
   fallLimit: 150,
   /** Same streaming-hole recovery as the on-foot controller (see PLAYER.floorRecoveryDrop). */
-  floorRecoveryDrop: 3,
+  floorRecoveryDrop: 0.5,
   floorRecoveryBand: 3,
 } as const;
 
@@ -102,10 +103,9 @@ export class CarController {
   }
 
   private recoverFromFloorGap(): void {
-    if (this.position.y > this.lastSafe.y - CAR.floorRecoveryDrop) return;
-    const top = this.world.heightAt(this.position.x, this.position.z);
-    if (top === null || Math.abs(top - this.lastSafe.y) > CAR.floorRecoveryBand) return;
-    this.position.y = top;
+    const floor = floorAboveFeet(this.world, this.ray, this.position, this.lastSafe, CAR);
+    if (floor === null) return;
+    this.position.y = floor;
     this.verticalSpeed = 0;
     this.onGround = true;
     this.lastSafe.copy(this.position);

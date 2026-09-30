@@ -220,7 +220,10 @@ function wallStop(plan: Plan): Step {
       yaw: () => plan.wall?.yaw ?? 0,
       check: (ctx) => {
         const c = ctx.character;
-        const ahead = clearance(ctx.world, c.position, plan.wall?.yaw ?? 0, 2);
+        // Real façades curve, so the player may slide a little before stopping: look ±45°.
+        const yaw = plan.wall?.yaw ?? 0;
+        const fan = [-2, -1, 0, 1, 2].map((k) => yaw + (k * Math.PI) / 8);
+        const ahead = Math.min(...fan.map((y) => clearance(ctx.world, c.position, y, 2)));
         if (ahead > 0.9) return `wall is ${ahead.toFixed(2)} m away: walked through or bounced off`;
         if (c.foot.speed > STOPPED) return `still moving at ${c.foot.speed.toFixed(1)} m/s`;
         return undefined;

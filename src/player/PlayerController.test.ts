@@ -103,6 +103,44 @@ describe('PlayerController on the demo city', () => {
     expect(player.onGround).toBe(true);
   });
 
+  it('is caught within about half a metre when a brief hole closes', () => {
+    let blind = false;
+    const flaky = {
+      raycast: (...args: Parameters<DemoCitySource['raycast']>) =>
+        blind ? null : city.raycast(...args),
+      heightAt: (x: number, z: number) => (blind ? null : city.heightAt(x, z)),
+    } as unknown as DemoCitySource;
+    const player = new PlayerController(flaky);
+    player.spawnAt(0, 0, 24);
+    let lowest = 0;
+    blind = true; // a short tile swap: the street vanishes for a quarter second
+    for (let t = 0; t < 0.25; t += DT) {
+      player.update(DT, idle, 0);
+      lowest = Math.min(lowest, player.position.y);
+    }
+    blind = false;
+    for (let t = 0; t < 0.5; t += DT) {
+      player.update(DT, idle, 0);
+      lowest = Math.min(lowest, player.position.y);
+    }
+    expect(player.position.y).toBeCloseTo(0, 3);
+    expect(player.onGround).toBe(true);
+    expect(lowest).toBeGreaterThan(-1);
+  });
+
+  it('is not pulled back up when stepping off a low roof', () => {
+    const low = new DemoCitySource(new LocalFrame(SPAWN), { minHeight: 1.6, maxHeight: 2 });
+    return low.load().then(() => {
+      const roof = low.heightAt(24, 24) ?? 0;
+      const player = new PlayerController(low);
+      player.spawnAt(24, roof, 24);
+      run(player, { ...idle, forward: 0, right: -1 }, 5); // walk west off the edge into the street
+      expect(roof).toBeGreaterThan(1.5);
+      expect(player.position.y).toBeCloseTo(0, 3);
+      expect(player.onGround).toBe(true);
+    });
+  });
+
   it('still falls normally off a roof edge', () => {
     const roof = city.heightAt(24, 24) ?? 0;
     const player = spawn(24, 24);

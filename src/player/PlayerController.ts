@@ -1,4 +1,5 @@
 import { Ray, Vector3 } from 'three';
+import { floorAboveFeet } from '../world/ground';
 import type { WorldSource } from '../world/WorldSource';
 
 /** What the player wants to do this frame, independent of input device. */
@@ -30,10 +31,11 @@ export const PLAYER = {
   fallLimit: 150,
   /**
    * Streaming tiles can briefly leave a hole while they swap detail levels. If the player has
-   * dropped this far below where they stood, and the surface at their spot is back within
-   * `floorRecoveryBand` of that height, they fell through their own floor: put them back on it.
+   * dropped this far below where they stood and there is floor above their feet at that height,
+   * they fell through it: put them back on it. A real drop (roof edge, ledge) has only air there.
    */
-  floorRecoveryDrop: 3,
+  floorRecoveryDrop: 0.5,
+  /** The recovered floor must be within this of the last safe height. */
   floorRecoveryBand: 3,
   /** Wait this long after ground first appears, so tiles can refine before spawning. */
   spawnSettleSeconds: 1.5,
@@ -126,10 +128,9 @@ export class PlayerController {
   }
 
   private recoverFromFloorGap(): void {
-    if (this.position.y > this.lastSafe.y - PLAYER.floorRecoveryDrop) return;
-    const top = this.world.heightAt(this.position.x, this.position.z);
-    if (top === null || Math.abs(top - this.lastSafe.y) > PLAYER.floorRecoveryBand) return;
-    this.position.y = top;
+    const floor = floorAboveFeet(this.world, this.ray, this.position, this.lastSafe, PLAYER);
+    if (floor === null) return;
+    this.position.y = floor;
     this.velocity.y = 0;
     this.onGround = true;
     this.lastSafe.copy(this.position);
