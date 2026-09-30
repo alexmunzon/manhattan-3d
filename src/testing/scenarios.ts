@@ -372,7 +372,8 @@ function drive(plan: Plan, seconds: number): Step {
   let driveFrom = 0;
   return {
     name: `drive for ${seconds} s (W, steering)`,
-    timeout: seconds + REVERSE_SECONDS + 2,
+    // Room for a bump-and-back-out partway through, on top of the full drive.
+    timeout: seconds * 2 + REVERSE_SECONDS + 2,
     begin: (ctx) => {
       plan.start = ctx.character.car.position.clone();
       nextAim = 0;
