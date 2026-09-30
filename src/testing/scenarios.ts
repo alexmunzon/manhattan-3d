@@ -261,7 +261,10 @@ function wallStop(plan: Plan): Step {
     timeout: SECONDS + 1,
     begin: (ctx) => {
       from = ctx.character.position.clone();
-      face = clearance(ctx.world, from, plan.wall?.yaw ?? 0, 2);
+      // Knee-high ledges count too, so measure the face at knee height as well as 1 m.
+      const knee = from.clone().setY(from.y - 0.5);
+      const yaw = plan.wall?.yaw ?? 0;
+      face = Math.min(clearance(ctx.world, from, yaw, 2), clearance(ctx.world, knee, yaw, 2));
       return face >= 2 ? 'no wall ahead to walk into' : undefined;
     },
     tick: (ctx) => (ctx.t >= SECONDS ? 'done' : { input: { forward: 1 }, yaw: plan.wall?.yaw }),

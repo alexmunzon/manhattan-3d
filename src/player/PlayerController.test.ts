@@ -141,6 +141,28 @@ describe('PlayerController on the demo city', () => {
     });
   });
 
+  it('walks along a 29 cm seam between tiles without falling in', () => {
+    // Same crack as measured on Google tiles: downward rays inside the strip find nothing.
+    const seam = {
+      raycast: (...args: Parameters<DemoCitySource['raycast']>) => {
+        const [ray] = args;
+        const inCrack = Math.abs(ray.origin.x) < 0.145 && ray.direction.y < -0.5;
+        return inCrack ? null : city.raycast(...args);
+      },
+      heightAt: (x: number, z: number) => (Math.abs(x) < 0.145 ? null : city.heightAt(x, z)),
+    } as unknown as DemoCitySource;
+    const player = new PlayerController(seam);
+    player.spawnAt(0, 0, 60);
+    let lowest = 0;
+    for (let t = 0; t < 2; t += DT) {
+      player.update(DT, { ...idle, forward: 1 }, 0); // north, right along the crack
+      lowest = Math.min(lowest, player.position.y);
+    }
+    expect(player.position.z).toBeLessThan(55);
+    expect(lowest).toBeGreaterThan(-0.05);
+    expect(player.onGround).toBe(true);
+  });
+
   it('still falls normally off a roof edge', () => {
     const roof = city.heightAt(24, 24) ?? 0;
     const player = spawn(24, 24);

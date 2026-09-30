@@ -44,6 +44,11 @@ export const PLAYER = {
 const WALL_PROBE_HEIGHTS = [PLAYER.stepHeight + 0.05, 1.0, 1.6] as const;
 const SLIDE_ITERATIONS = 2;
 const GROUNDED_PROBE_LIFT = 1.0;
+/**
+ * Photogrammetry tiles can meet with a hairline-to-30 cm gap. If the centre ray drops through
+ * one, probes this far around the feet (inside the body radius) still find the floor.
+ */
+const FOOT_RING_RADIUS = 0.25;
 
 /**
  * Kinematic third-person character: walks, sprints, jumps, slides along walls and steps up curbs,
@@ -192,18 +197,37 @@ export class PlayerController {
     return nearest < Infinity;
   }
 
+  /**
+   * Height of the floor under the feet: the centre ray if it hits, else the highest of a small
+   * ring of rays (so a seam between tiles can't swallow the player). Null if there is none.
+   */
+  private probeFloor(lift: number, reach: number): number | null {
+    const { x, y, z } = this.position;
+    this.ray.direction.set(0, -1, 0);
+    this.ray.origin.set(x, y + lift, z);
+    const centre = this.world.raycast(this.ray, reach);
+    if (centre) return centre.normal.y >= PLAYER.minFloorNormalY ? centre.point.y : null;
+    let best: number | null = null;
+    for (const [dx, dz] of FOOT_RING) {
+      this.ray.origin.set(x + dx, y + lift, z + dz);
+      const hit = this.world.raycast(this.ray, reach);
+      if (hit && hit.normal.y >= PLAYER.minFloorNormalY && (best === null || hit.point.y > best)) {
+        best = hit.point.y;
+      }
+    }
+    return best;
+  }
+
   private moveVertically(dt: number): void {
     const targetY = this.position.y + this.velocity.y * dt;
     const falling = this.velocity.y <= 0;
     const lift = this.onGround ? GROUNDED_PROBE_LIFT : PLAYER.stepHeight;
     const snap = this.onGround && falling ? PLAYER.groundSnap : 0;
-    this.ray.origin.set(this.position.x, this.position.y + lift, this.position.z);
-    this.ray.direction.set(0, -1, 0);
-    const reach = this.ray.origin.y - targetY + snap;
-    const hit = falling ? this.world.raycast(this.ray, Math.max(reach, 0)) : null;
+    const reach = Math.max(lift - this.velocity.y * dt + snap, 0); // down to targetY, plus snap
+    const floor = falling ? this.probeFloor(lift, reach) : null;
 
-    if (hit && hit.normal.y >= PLAYER.minFloorNormalY) {
-      this.position.y = hit.point.y;
+    if (floor !== null) {
+      this.position.y = floor;
       this.velocity.y = 0;
       this.onGround = true;
       this.lastSafe.copy(this.position);
@@ -213,6 +237,14 @@ export class PlayerController {
     }
   }
 }
+
+/** Ring of extra ground probes (x, z offsets) used when the centre ray finds no floor. */
+const FOOT_RING = [
+  [FOOT_RING_RADIUS, 0],
+  [-FOOT_RING_RADIUS, 0],
+  [0, FOOT_RING_RADIUS],
+  [0, -FOOT_RING_RADIUS],
+] as const;
 
 /** Moves `value` toward `target` by at most `step`. */
 function approach(value: number, target: number, step: number): number {
