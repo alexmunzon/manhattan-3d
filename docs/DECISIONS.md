@@ -30,7 +30,7 @@ ever exists, it can be added as a new `WorldSource` adapter.
 **Decision:** The demo is the README video plus local play with the player's own restricted key.
 **Consequences:** There's no surprise bill. Reconsider later with a server-side quota and a kill switch.
 
-## ADR-004 — Collision from loaded tiles, in memory only (2026-09-29, provisional)
+## ADR-004 — Collision from loaded tiles, in memory only (2026-09-29, provisional; see ADR-009)
 
 **Context:** Photogrammetry has no physics. A separate collision source would drift from the visuals.
 **Decision:** Build BVH and trimesh colliders from nearby loaded tiles at runtime and dispose them with
@@ -83,3 +83,41 @@ resolves a curated list of Manhattan places or raw lat/lon, checked against a ha
 outline.
 **Consequences:** The key stays restricted to the Map Tiles API. The minimap costs a second render
 pass (about 2x draw calls) and shows only loaded detail. There's no free-text street-address search.
+
+## ADR-009 — Google policy fit for runtime collision (2026-09-30)
+
+**Context:** ADR-004 builds collision from the tiles that are currently rendered and asked for a policy
+check. Google's documents were reviewed on 2026-09-30 (a web research pass; quotes are short and the
+pages should be re-read before any hosted release):
+
+- Maps Platform Terms of Service, https://cloud.google.com/maps-platform/terms (modified 2026-08-26):
+  no caching of Google Maps Content "except as expressly permitted"; no pre-fetching, indexing, storing
+  or rehosting outside the services; "Customer will not create content based on Google Maps Content"
+  (its examples: tracing roads and building outlines, 3D models from 45° imagery, terrain from Elevation).
+- Service Specific Terms, https://cloud.google.com/maps-platform/terms/maps-service-terms (modified
+  2026-06-10): no Map Tiles or Photorealistic 3D Tiles clause found, so there is no tile caching allowance.
+- Map Tiles API policies, https://developers.google.com/maps/documentation/tile/policies (updated
+  2026-09-24): use is for "map visualizations" and "may not" be used for image analysis, machine
+  interpretation, object detection, "Geodata extraction or resale" or offline use; you may overlay your
+  own 3D objects as long as they "aren't extracted, traced, or otherwise derived" from the tiles; cache
+  headers must be respected; the Google logo and per-tile copyright text must be shown unmodified.
+- Usage and billing, https://developers.google.com/maps/documentation/tile/usage-and-billing (updated
+  2026-09-24): root tileset requests are the quota unit (10,000 per day); a session token allows up to
+  three hours of renderer tile requests per root request; the pricing page lists the Photorealistic 3D
+  Tiles SKU at $6.00 per 1,000 in the first tier. No sentence says in so many words that only root
+  requests are billed, but the SKU and quota wording point that way.
+- No official Google guidance, blog post or sample about collision or physics against the tiles was
+  found. Cesium exposes tileset collision for camera clamping, but that is a Cesium feature, not a
+  Google statement.
+
+**Decision:** Keep ADR-004. Raycasting against the geometry the renderer already holds in memory is
+treated as part of visualising and moving through the scene, not as creating content or extracting
+geodata: nothing is traced, exported, stored, analysed or reused, and the acceleration structures are
+disposed with their tiles. The game stays visualization-only: no persistence (ADR-004), no offline use,
+no geometry export, no analysis, tiles never shown with or near a non-Google map, logo and copyright
+line always visible. Status: **believed compliant, not confirmed by Google.**
+
+**Consequences:** The residual risk is that "machine interpretation" or "derived" could be read to cover
+collision geometry. Before any hosted or commercial release, ask Google Maps Platform support in
+writing whether runtime, in-memory collision against displayed tiles is acceptable, and record the
+answer here. If the answer is no, the fallback is OSM building footprints extruded as proxy colliders.

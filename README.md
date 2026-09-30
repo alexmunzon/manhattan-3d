@@ -5,7 +5,20 @@ over the real city.**
 
 > 🚧 In development. Current milestone and progress: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
-<!-- Gameplay video / GIF goes here at M6 -->
+<!-- HERO: replace this comment with the line below once docs/media/hero.gif exists.
+![Walking, climbing, driving and gliding through Lower Manhattan](docs/media/hero.gif)
+
+How to record it (macOS, about 10 minutes):
+1. `npm run dev`, open http://127.0.0.1:5173/ (one tab: each load is one billable tiles session).
+   Wait for the street to sharpen, click to capture the mouse, press ` to hide the debug overlay if on.
+2. Press ⌘⇧5 → "Record Selected Portion", drag a 1280×720 box over the game, and record about 25 s:
+   walk and sprint a block → climb a ledge with Space → V to call the taxi, drive a block, Space to
+   brake, V to exit → run off a rooftop or ledge, H to open the glider, bank and land → R.
+3. Convert the .mov (keep under 10 MB so GitHub renders it inline):
+   ffmpeg -i hero.mov -t 25 -vf "fps=15,scale=960:-1:flags=lanczos" -c:v gif docs/media/hero.gif
+   ffmpeg -i hero.mov -t 25 -vf "scale=1280:-2" -c:v libx264 -crf 28 -an docs/media/hero.mp4
+   (`brew install ffmpeg` if needed; a smaller GIF: lower fps to 12 or scale to 800.)
+-->
 
 ## Features
 
@@ -17,6 +30,18 @@ over the real city.**
   shareable spawn links, avatar colours, a graphics toggle, and a debug overlay
 - Streaming-safe physics: no falling through the city while tiles refine
 - An offline procedural demo city, so the game runs and is tested with no API key
+- A scripted robot playtester that runs the whole loop (walk → climb → drive → glide → land → reset)
+  in CI on the demo city and, on demand, on the real tiles
+
+## Screenshots
+
+<!-- Add PNGs to docs/media/ (⌘⇧4, then space, click the browser window) and uncomment:
+| Times Square on foot | Climbing a Lower Manhattan ledge |
+| --- | --- |
+| ![](docs/media/times-square.png) | ![](docs/media/climb.png) |
+| Driving the taxi down Broadway | Gliding over the Financial District |
+| ![](docs/media/taxi.png) | ![](docs/media/glide.png) |
+-->
 
 ## Controls
 
@@ -82,6 +107,19 @@ The game starts in the offline demo city. To load real Manhattan:
 npm run check      # lint + typecheck + unit tests (never calls paid APIs)
 ```
 
+The unit tests include scripted gameplay scenarios (`src/testing/`) on the offline demo city: a robot
+player walks, climbs, drives, glides and resets while every frame is checked for falls through the
+world, walking through walls, stuck climbs and camera or car glitches. The same scenarios run in the
+browser on whatever city is loaded:
+
+```
+http://127.0.0.1:5173/?headless&selftest=loop      # full loop (add &demo for the free demo city)
+http://127.0.0.1:5173/?headless&selftest=climbs    # climb check on 10 real façades
+```
+
+Results show in a HUD panel. Each page load with a key is one billable Map Tiles session, so keep one
+tab open and add `?demo` for free checks.
+
 ## How this was built
 
 This project is built with Claude Code as a coding agent, across many sessions:
@@ -94,8 +132,11 @@ Each milestone has explicit acceptance criteria, and nothing is marked done unti
 
 ## Data and attribution
 
-- 3D city imagery and geometry © Google and its data providers. Attribution is shown in-game as required.
-- The repository contains **no map data**. Tiles are streamed at runtime and never stored.
+- 3D city imagery and geometry © Google and its data providers. The Google logo and the data
+  attribution line are always shown in-game, as the Map Tiles API policies require.
+- The repository contains **no map data**. Tiles are streamed at runtime and never stored. Collision is
+  computed against the tiles already on screen and disposed with them; see ADR-004 and ADR-009 in
+  [`docs/DECISIONS.md`](docs/DECISIONS.md) for the policy reasoning.
 - It contains no Apple Maps data or extraction code.
 - Character and taxi models by Quaternius. Full credits: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
