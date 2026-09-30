@@ -12,6 +12,9 @@ export const LEDGE = {
   standInset: 0.45,
   /** Other landing spots tried when real, uneven geometry has no floor at the first one. */
   fallbackInsets: [0.3, 0.65],
+  /** The top must be flat this far around the landing spot, so posts and bollards don't count. */
+  platformRadius: 0.2,
+  platformTolerance: 0.15,
   /** Clear space required above the ledge for the player's body. */
   headroom: 1.8,
   minFloorNormalY: 0.7,
@@ -83,5 +86,27 @@ function findTop(
   ray.origin.set(point.x, point.y + 0.05, point.z);
   ray.direction.set(0, 1, 0);
   if (world.raycast(ray, LEDGE.headroom)) return null;
-  return point;
+  return isPlatform(world, point, direction) ? point : null;
+}
+
+/** True if there is floor at the top's height all around `point` (front, back and both sides). */
+function isPlatform(world: WorldSource, point: Vector3, direction: Vector3): boolean {
+  const r = LEDGE.platformRadius;
+  for (const [along, across] of [
+    [r, 0],
+    [-r, 0],
+    [0, r],
+    [0, -r],
+  ] as const) {
+    ray.origin.set(
+      point.x + direction.x * along - direction.z * across,
+      point.y + LEDGE.platformTolerance * 2,
+      point.z + direction.z * along + direction.x * across,
+    );
+    ray.direction.set(0, -1, 0);
+    const hit = world.raycast(ray, LEDGE.platformTolerance * 3);
+    if (!hit || hit.normal.y < LEDGE.minFloorNormalY) return false;
+    if (Math.abs(hit.point.y - point.y) > LEDGE.platformTolerance) return false;
+  }
+  return true;
 }

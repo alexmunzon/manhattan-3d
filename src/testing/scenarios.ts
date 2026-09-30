@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
 import type { Character, CharacterInput } from '../player/Character';
+import { findLedge } from '../player/ledge';
 import { createRandom } from '../world/random';
 import {
   clearance,
@@ -220,12 +221,19 @@ function walkToClimbableWall(plan: Plan): Step {
         }
         leg = 1;
       }
-      return walkToward(ctx.character, wall.stand, 0.15);
+      return walkToward(ctx.character, wall.stand, 0.1);
     },
-    check: (ctx) =>
-      plan.wall
-        ? standingCheck(ctx)
-        : `no climbable ledge found within ${WIDE_SEARCH_RADIUS} m after ${SEARCH_SECONDS} s`,
+    check: (ctx) => {
+      const wall = plan.wall;
+      if (!wall)
+        return `no climbable ledge found within ${WIDE_SEARCH_RADIUS} m after ${SEARCH_SECONDS} s`;
+      // The game looks for the ledge from where the player actually stands, not the survey point.
+      if (!findLedge(ctx.world, ctx.character.position, forwardOf(wall.yaw), false)) {
+        const off = horizontal(ctx.character.position, wall.stand).toFixed(2);
+        return `stopped ${off} m from the surveyed spot, where the game sees no ledge`;
+      }
+      return standingCheck(ctx);
+    },
     note: () => (moved > 0 ? `scripted: moved ${moved.toFixed(0)} m to reach a ledge` : undefined),
   };
 }

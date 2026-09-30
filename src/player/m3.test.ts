@@ -1,8 +1,18 @@
-import { Ray, Vector3 } from 'three';
+import {
+  BoxGeometry,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  PlaneGeometry,
+  Ray,
+  Raycaster,
+  Vector3,
+} from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SPAWN } from '../config/world';
 import { DemoCitySource } from '../world/DemoCitySource';
 import { LocalFrame } from '../world/geo';
+import { createWorldHit, toWorldHit } from '../world/WorldSource';
 import { Character, type CharacterInput } from './Character';
 import { GLIDER, GliderController } from './GliderController';
 import { findLedge } from './ledge';
@@ -66,6 +76,36 @@ describe('findLedge', () => {
     if (!face) throw new Error('expected a low wall east of the street');
     const ledge = findLedge(knee, new Vector3(face.point.x - 0.5, 0, 24), EAST, false);
     expect(ledge?.top.y).toBeGreaterThan(0.7);
+  });
+
+  it('climbs a knee-high planter but not a bollard of the same height', () => {
+    // Street furniture on open ground: a 1 m-deep planter and a 0.3 m-wide bollard, both 0.9 m tall.
+    const scene = new Group();
+    const ground = new Mesh(
+      new PlaneGeometry(50, 50).rotateX(-Math.PI / 2),
+      new MeshBasicMaterial(),
+    );
+    const planter = new Mesh(
+      new BoxGeometry(1, 0.9, 2).translate(0.5, 0.45, 0),
+      new MeshBasicMaterial(),
+    );
+    const bollard = new Mesh(
+      new BoxGeometry(0.3, 0.9, 0.3).translate(0.15, 0.45, 10),
+      new MeshBasicMaterial(),
+    );
+    scene.add(ground, planter, bollard);
+    scene.updateMatrixWorld(true);
+    const raycaster = new Raycaster();
+    const world = {
+      raycast: (ray: Ray, max: number) => {
+        raycaster.ray.copy(ray);
+        raycaster.far = max;
+        const hit = raycaster.intersectObject(scene, true)[0];
+        return hit ? toWorldHit(hit, raycaster.ray, createWorldHit()) : null;
+      },
+    } as unknown as DemoCitySource;
+    expect(findLedge(world, new Vector3(-0.5, 0, 0), EAST, false)).not.toBeNull();
+    expect(findLedge(world, new Vector3(-0.5, 0, 10), EAST, false)).toBeNull();
   });
 
   it('rejects walls that are out of reach', () => {
