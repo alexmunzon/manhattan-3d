@@ -8,6 +8,8 @@ import type { WorldSource } from '../world/WorldSource';
  */
 
 const PROBE_HEIGHT = 1;
+/** Second wall probe height: knee-high ledges, planters and plinths sit below the 1 m ray. */
+const KNEE_HEIGHT = 0.5;
 const WALL_NORMAL_MAX_Y = 0.7;
 /** Stand this far in front of a wall face before trying to climb it. */
 const STAND_OFF = 0.5;
@@ -75,13 +77,16 @@ export function findWalls(
   for (const origin of origins) {
     for (let i = 0; i < headings; i++) {
       const yaw = (i / headings) * Math.PI * 2;
-      ray.origin.set(origin.x, origin.y + PROBE_HEIGHT, origin.z);
       forwardOf(yaw, dir);
       ray.direction.copy(dir);
-      const hit = world.raycast(ray, radius);
-      if (!hit || Math.abs(hit.normal.y) >= WALL_NORMAL_MAX_Y || hit.distance < STAND_OFF * 2) {
-        continue;
+      // The nearest face at either height: a plinth or sill is where the body actually stops.
+      let hit: ReturnType<WorldSource['raycast']> = null;
+      for (const height of [PROBE_HEIGHT, KNEE_HEIGHT]) {
+        ray.origin.set(origin.x, origin.y + height, origin.z);
+        const h = world.raycast(ray, hit?.distance ?? radius);
+        if (h && Math.abs(h.normal.y) < WALL_NORMAL_MAX_Y) hit = h;
       }
+      if (!hit || hit.distance < STAND_OFF * 2) continue;
       // Face the wall square-on (along its normal), as a player lining up a climb would.
       const facing = new Vector3(-hit.normal.x, 0, -hit.normal.z).normalize();
       const stand = hit.point.clone().addScaledVector(facing, -STAND_OFF);

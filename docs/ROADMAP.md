@@ -48,9 +48,9 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
 ## M6 — Release
 
-- [~] Full loop in one run: walk → climb → drive → exit → glide → land → reset. Demo city: passes
-  (Vitest + browser selftest). Google tiles: walk → wall stop → climb → down → call → enter → drive
-  verified; brake → exit → glide → land → reset not yet run on Google
+- [x] Full loop in one run: walk → climb → drive → exit → glide → land → reset. Demo city: passes
+  (Vitest + browser selftest). Google tiles: all 15 steps pass in one `?selftest=loop` run
+  (2026-09-30), no per-frame violations
 - [x] Scripted gameplay selftest (`src/testing/`): full loop, reset mid-action, button mashing,
   façade climb check; per-frame checks (fall-through, walk-through, stuck climb, car, camera)
 - [~] Climbing on real façades: knee-high ledges, reach 1.1 m, platform check (no bollards) unit-tested;

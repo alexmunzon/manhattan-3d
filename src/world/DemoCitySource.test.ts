@@ -33,6 +33,7 @@ describe('DemoCitySource', () => {
   it('finds the ground in a street and rooftops above it', async () => {
     const city = await loaded();
     // Streets run through the centre of the grid when blocksPerSide is even.
+    expect(city.heightAt(0, 0)).not.toBeNull(); // toBeCloseTo would accept null as 0
     expect(city.heightAt(0, 0)).toBeCloseTo(0, 5);
     const heights = [40, 120, 200].map((x) => city.heightAt(x, 40) ?? 0);
     expect(Math.max(...heights)).toBeGreaterThan(10);

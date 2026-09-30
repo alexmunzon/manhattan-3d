@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { SPAWN } from '../config/world';
 import { DemoCitySource } from '../world/DemoCitySource';
 import { LocalFrame } from '../world/geo';
-import { Character, type CharacterInput } from './Character';
+import { Character, type CharacterInput, NO_ROOM_FOR_TAXI } from './Character';
 
 const DT = 1 / 60;
 const idle: CharacterInput = {
@@ -47,6 +47,17 @@ describe('Character spawning', () => {
 });
 
 describe('Character driving', () => {
+  it('tells the player when the taxi has no room to park', () => {
+    const c = spawned();
+    expect(c.takeNotice()).toBeNull();
+    c.car.position.set(500, 0, 500); // too far to enter, so V calls it over
+    c.car.fits = () => false; // boxed in: nowhere nearby fits a car
+    c.update(DT, { ...idle, vehicle: true }, 0);
+    expect(c.mode).toBe('onFoot');
+    expect(c.takeNotice()).toBe(NO_ROOM_FOR_TAXI);
+    expect(c.takeNotice()).toBeNull(); // one-shot
+  });
+
   it('enters the nearby car with V, drives, and exits on foot beside it', () => {
     const c = spawned();
     c.update(DT, { ...idle, vehicle: true }, 0);

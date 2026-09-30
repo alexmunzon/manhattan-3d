@@ -1,5 +1,5 @@
 import { Ray, Vector3 } from 'three';
-import { floorAboveFeet } from '../world/ground';
+import { FLOOR_RING, floorAboveFeet } from '../world/ground';
 import type { WorldSource } from '../world/WorldSource';
 
 /** What the player wants to do this frame, independent of input device. */
@@ -48,7 +48,6 @@ const GROUNDED_PROBE_LIFT = 1.0;
  * Photogrammetry tiles can meet with a hairline-to-30 cm gap. If the centre ray drops through
  * one, probes this far around the feet (inside the body radius) still find the floor.
  */
-const FOOT_RING_RADIUS = 0.25;
 
 /**
  * Kinematic third-person character: walks, sprints, jumps, slides along walls and steps up curbs,
@@ -208,7 +207,7 @@ export class PlayerController {
     const centre = this.world.raycast(this.ray, reach);
     if (centre) return centre.normal.y >= PLAYER.minFloorNormalY ? centre.point.y : null;
     let best: number | null = null;
-    for (const [dx, dz] of FOOT_RING) {
+    for (const [dx, dz] of FLOOR_RING) {
       this.ray.origin.set(x + dx, y + lift, z + dz);
       const hit = this.world.raycast(this.ray, reach);
       if (hit && hit.normal.y >= PLAYER.minFloorNormalY && (best === null || hit.point.y > best)) {
@@ -237,14 +236,6 @@ export class PlayerController {
     }
   }
 }
-
-/** Ring of extra ground probes (x, z offsets) used when the centre ray finds no floor. */
-const FOOT_RING = [
-  [FOOT_RING_RADIUS, 0],
-  [-FOOT_RING_RADIUS, 0],
-  [0, FOOT_RING_RADIUS],
-  [0, -FOOT_RING_RADIUS],
-] as const;
 
 /** Moves `value` toward `target` by at most `step`. */
 function approach(value: number, target: number, step: number): number {

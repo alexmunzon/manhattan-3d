@@ -41,6 +41,7 @@ const CAR_CALL_MAX_STEP = 1;
 /** Open road ahead that makes a parking spot good enough to stop searching. */
 const CAR_CALL_ROAD = 40;
 const EXIT_SIDE_OFFSET = CAR.halfWidth + 0.8;
+export const NO_ROOM_FOR_TAXI = 'No room for the taxi here. Call it from an open street.';
 
 /**
  * Owns the player's mode (on foot, climbing, gliding) and routes each frame to the one active
@@ -53,6 +54,8 @@ export class Character {
   readonly car: CarController;
   /** True once the car has been placed in the world. */
   carPlaced = false;
+  /** One-shot message for the HUD (for example, the taxi found no room). Cleared by `takeNotice`. */
+  private pendingNotice: string | null = null;
   /** Facing yaw for the avatar (0 = north). */
   facing = 0;
 
@@ -265,6 +268,14 @@ export class Character {
       }
     }
     if (best) this.carPlaced = this.car.place(best.x, best.z, best.yaw);
+    else this.pendingNotice = NO_ROOM_FOR_TAXI;
+  }
+
+  /** Returns and clears the pending HUD message, if any. */
+  takeNotice(): string | null {
+    const notice = this.pendingNotice;
+    this.pendingNotice = null;
+    return notice;
   }
 
   private updateDrive(dt: number, input: CharacterInput): void {

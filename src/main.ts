@@ -21,6 +21,7 @@ import { Minimap } from './hud/Minimap';
 import { ModeHud } from './hud/modeHud';
 import { showNotice } from './hud/notice';
 import { PlayHint } from './hud/playHint';
+import { Toast } from './hud/toast';
 import { showSetupScreen } from './hud/setupScreen';
 import { TeleportBar } from './hud/TeleportBar';
 import { Input } from './input/Input';
@@ -105,6 +106,7 @@ async function start(app: HTMLElement): Promise<void> {
   const followCamera = new FollowCamera(camera);
   const modeHud = new ModeHud(hud);
   const hint = new PlayHint(hud);
+  const toast = new Toast(hud);
   const minimap = new Minimap(hud, world);
   const info = new InfoPanel(hud, {
     onColor: (color) => {
@@ -206,6 +208,8 @@ async function start(app: HTMLElement): Promise<void> {
       }
       followCamera.update(dt, position, look, world);
       selftest?.observe(dt, intent, camera.position);
+      const notice = character.takeNotice();
+      if (notice) toast.show(notice);
       if (gliding) modeHud.set('Gliding', character.speed, character.altitude);
       else modeHud.set(driving ? 'Driving' : null, character.speed, null);
     }

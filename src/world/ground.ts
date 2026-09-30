@@ -6,6 +6,17 @@ const SAMPLE_STEP = 4;
 const LEVEL_TOLERANCE = 0.5;
 /** Hole recovery looks down from this far above the last safe floor (bumps and slopes). */
 const FLOOR_RECOVERY_LIFT = 0.5;
+const FLOOR_RING_RADIUS = 0.25;
+/**
+ * Extra downward probes (x, z offsets) around a point, used when the centre ray finds nothing.
+ * Google tiles meet at seams up to 29 cm wide where a single ray sees straight through the world.
+ */
+export const FLOOR_RING: readonly (readonly [number, number])[] = [
+  [FLOOR_RING_RADIUS, 0],
+  [-FLOOR_RING_RADIUS, 0],
+  [0, FLOOR_RING_RADIUS],
+  [0, -FLOOR_RING_RADIUS],
+];
 
 /**
  * Finds street level near (x, z): the lowest surface within `radius`, preferring the sample
@@ -50,10 +61,22 @@ export function floorAboveFeet(
 ): number | null {
   if (position.y > lastSafe.y - limits.floorRecoveryDrop) return null;
   const from = lastSafe.y + FLOOR_RECOVERY_LIFT;
-  ray.origin.set(position.x, from, position.z);
+  const reach = from - position.y;
   ray.direction.set(0, -1, 0);
-  const hit = world.raycast(ray, from - position.y);
-  if (!hit || hit.normal.y < limits.minFloorNormalY) return null;
-  if (hit.point.y < lastSafe.y - limits.floorRecoveryBand) return null;
-  return hit.point.y;
+  const floorAt = (x: number, z: number): number | null => {
+    ray.origin.set(x, from, z);
+    const hit = world.raycast(ray, reach);
+    if (!hit || hit.normal.y < limits.minFloorNormalY) return null;
+    if (hit.point.y < lastSafe.y - limits.floorRecoveryBand) return null;
+    return hit.point.y;
+  };
+  // A seam between tiles can swallow the centre ray, exactly as it swallowed the player.
+  const centre = floorAt(position.x, position.z);
+  if (centre !== null) return centre;
+  let best: number | null = null;
+  for (const [dx, dz] of FLOOR_RING) {
+    const y = floorAt(position.x + dx, position.z + dz);
+    if (y !== null && (best === null || y > best)) best = y;
+  }
+  return best;
 }
