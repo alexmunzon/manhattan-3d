@@ -12,7 +12,7 @@ import { FollowCamera, type CameraRig } from './camera/FollowCamera';
 import { readMapsApiKey } from './config/env';
 import { isInManhattan } from './config/places';
 import { SPAWN } from './config/world';
-import { AttributionLine } from './hud/attribution';
+import { AttributionLine, GOOGLE_MAPS_LOGO } from './hud/attribution';
 import { mountControlsLegend } from './hud/ControlsLegend';
 import { DebugOverlay } from './hud/DebugOverlay';
 import { el } from './hud/dom';
@@ -127,7 +127,10 @@ async function start(app: HTMLElement): Promise<void> {
   });
   mountControlsLegend(hud);
   const debug = new DebugOverlay(hud);
-  const attribution = new AttributionLine(hud);
+  // Google's policy requires its logo on screen with Google tiles; the demo city shows none.
+  const attribution = new AttributionLine(hud, {
+    logo: world.id === 'google' ? GOOGLE_MAPS_LOGO : undefined,
+  });
   if (!apiKey && !forceDemo) showSetupScreen(hud);
   const selftest = import.meta.env.DEV ? await loadSelftest(character, world, hud) : null;
 

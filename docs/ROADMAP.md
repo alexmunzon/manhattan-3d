@@ -3,7 +3,7 @@
 Status per item: `[ ]` not started · `[~]` in progress · `[x]` pass (verified) · `[!]` fail/blocked.
 Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 
-## Current: **M6 — Release** (carry-overs: M1 Google logo + policy check; human playtest of M2–M5 feel)
+## Current: **M6 — Release** (carry-over: human playtest of M2–M5 feel; M1 logo and policy check done)
 
 ## M0 — Scaffold
 
@@ -17,7 +17,8 @@ Update this file at the end of every session. Spec: `BUILD_PROMPT.md` §8.
 ## M1 — World streaming (Google tiles)
 
 - [x] `GoogleTilesSource` streams tiles around the configured Lower Manhattan spawn
-- [~] Dynamic attributions visible (verified); official Google logo asset still needed from Google brand resources
+- [x] Dynamic attributions visible (verified); official Google Maps logo (outlined variant, 18 px) from Google's
+      attribution assets shown with Google tiles only (wired 2026-10-01)
 - [x] Tile radius / LOD cap; distant tiles disposed; memory stable over repeated traversal (measured: 51–184 geometries over 3 laps, no growth)
 - [~] Clear errors: missing key verified in browser; rejected/quota/network messages unit-tested only
 - [~] Policy check: runtime collision against loaded tiles allowed? ADR-009 recorded (2026-09-30): believed
